@@ -282,6 +282,12 @@ const AppProvider = ({ children }) => {
       fireworks: { enabled: data.fireworksEnabled !== false, colors: data.fireworksColors || ["#c026d3", "#fbbf24", "#34d399", "#60a5fa", "#f87171"], style: data.fireworksStyle || "classic" },
       eventType: data.eventType || "party",
       coverImage: data.coverImage || null,
+      playlistUrl: data.playlistUrl || "",
+      moodBoard: data.moodBoard || [],
+      smartSections: data.smartSections || {},
+      inviteFont: data.inviteFont || "",
+      inviteEffect: data.inviteEffect || "auto",
+      inviteViews: 0,
       maxCapacity: data.isPrivate ? null : (parseInt(data.maxCapacity) || null),
       pops: [],
       status: "upcoming",
@@ -415,12 +421,14 @@ const AppProvider = ({ children }) => {
     const host = users.find((u) => u.id === party.hostId);
     const date = party.confirmedDate?.date || (party.dates[0]?.date || '');
     const location = party.location?.address || '';
-    const link = window.location.origin + window.location.pathname + 
-      '#join-party?partyId=' + partyId + 
+    const eventType = party.eventType || 'party';
+    const link = window.location.origin + window.location.pathname +
+      '#join-party?partyId=' + partyId +
       '&partyName=' + encodeURIComponent(party.title) +
       '&host=' + encodeURIComponent((host?.firstName || '') + ' ' + (host?.lastName || '')) +
       '&date=' + encodeURIComponent(date) +
-      '&location=' + encodeURIComponent(location);
+      '&location=' + encodeURIComponent(location) +
+      '&eventType=' + encodeURIComponent(eventType);
     return link;
   };
 
@@ -577,7 +585,11 @@ const AppProvider = ({ children }) => {
     getUnreadPops,
     markPopRead,
     getMutualFriendSuggestions,
-    joinPublicEvent
+    joinPublicEvent,
+    trackInviteView: (partyId) => {
+      const newParties = parties.map((p) => p.id === partyId ? { ...p, inviteViews: (p.inviteViews || 0) + 1 } : p);
+      saveParties(newParties);
+    }
   };
   return /* @__PURE__ */ React.createElement(AppCtx.Provider, { value: ctx }, children);
 };
@@ -701,6 +713,30 @@ const EventParticles = ({ eventType, onDone }) => {
             p.color = ["#fbbf24","#34d399","#60a5fa","#e879f9"][randInt(0,4)];
             p.vx = rand(-1, 1); p.vy = rand(-2.5, -0.5); p.type = "star"; p.y = rand(H * 0.2, H);
             break;
+          case "nye":
+            p.color = ["#fbbf24","#7c3aed","#e879f9","#ffffff"][randInt(0,4)];
+            p.x = W / 2 + rand(-W*0.3, W*0.3); p.y = H; p.vx = rand(-2, 2); p.vy = rand(-8, -3); p.type = randInt(0,2) === 0 ? "star" : "circle"; p.size = rand(4, 12); p.decay = rand(0.008, 0.02);
+            break;
+          case "baby_shower":
+            p.color = ["#f9a8d4","#93c5fd","#ffffff","#fde68a"][randInt(0,4)];
+            p.vx = rand(-0.8, 0.8); p.vy = rand(1, 3); p.type = randInt(0,2) === 0 ? "heart" : "star"; p.size = rand(4, 10);
+            break;
+          case "game_night":
+            p.color = ["#8b5cf6","#06b6d4","#fbbf24","#34d399"][randInt(0,4)];
+            p.vx = rand(-2, 2); p.vy = rand(-3, -1); p.type = "rect"; p.w = rand(8, 16); p.h = rand(8, 16); p.rot = rand(0, Math.PI * 2); p.rotSpeed = rand(-0.08, 0.08); p.y = rand(0, H);
+            break;
+          case "club_night":
+            p.color = ["#e879f9","#06b6d4","#fbbf24","#f87171","#7c3aed"][randInt(0,5)];
+            p.vx = rand(-3, 3); p.vy = rand(-5, -1); p.type = "circle"; p.size = rand(3, 14); p.y = rand(0, H); p.decay = rand(0.01, 0.025);
+            break;
+          case "brunch":
+            p.color = ["#fbbf24","#f59e0b","#ffffff","#34d399"][randInt(0,4)];
+            p.vx = rand(-1, 1); p.vy = rand(-2, -0.5); p.type = "circle"; p.size = rand(3, 10); p.y = rand(H * 0.3, H);
+            break;
+          case "kids_party":
+            p.color = ["#ef4444","#fbbf24","#34d399","#60a5fa","#e879f9","#f59e0b"][randInt(0,6)];
+            p.vx = rand(-2.5, 2.5); p.vy = rand(-5, -1); p.type = randInt(0,3) === 0 ? "star" : "circle"; p.size = rand(5, 16); p.y = rand(0, H);
+            break;
           default: // party
             p.color = ["#c026d3","#fbbf24","#34d399","#60a5fa","#f87171","#e879f9"][randInt(0,6)];
             p.vx = rand(-2, 2); p.vy = rand(-4, -1); p.type = "rect"; p.w = rand(6, 14); p.h = rand(3, 7); p.rot = rand(0, Math.PI * 2); p.rotSpeed = rand(-0.12, 0.12); p.y = rand(H * 0.1, H);
@@ -753,28 +789,14 @@ const QRCode = ({ value, size = 180 }) => {
     if (!containerRef.current) return;
     containerRef.current.innerHTML = '';
     if (typeof window.QRCode !== 'undefined') {
-      new window.QRCode(containerRef.current, {
-        text: value,
-        width: size,
-        height: size,
-        colorDark: "#1a0030",
-        colorLight: "#ffffff",
-        correctLevel: window.QRCode.CorrectLevel.M
-      });
+      new window.QRCode(containerRef.current, { text: value, width: size, height: size, colorDark: "#1a0030", colorLight: "#ffffff", correctLevel: window.QRCode.CorrectLevel.M });
     } else {
       containerRef.current.innerHTML = '<div style="width:'+size+'px;height:'+size+'px;display:flex;align-items:center;justify-content:center;background:white;border-radius:12px;color:#666;font-size:12px;text-align:center;padding:8px">QR loading...</div>';
       const check = setInterval(() => {
         if (typeof window.QRCode !== 'undefined') {
           clearInterval(check);
           containerRef.current.innerHTML = '';
-          new window.QRCode(containerRef.current, {
-            text: value,
-            width: size,
-            height: size,
-            colorDark: "#1a0030",
-            colorLight: "#ffffff",
-            correctLevel: window.QRCode.CorrectLevel.M
-          });
+          new window.QRCode(containerRef.current, { text: value, width: size, height: size, colorDark: "#1a0030", colorLight: "#ffffff", correctLevel: window.QRCode.CorrectLevel.M });
         }
       }, 200);
       setTimeout(() => clearInterval(check), 5000);
@@ -1072,19 +1094,49 @@ const HomeScreen = () => {
   })), photoFeed.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700, marginBottom: 10 } }, "\u{1F4F8} Party Memories"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 } }, photoFeed.map((ph) => /* @__PURE__ */ React.createElement("div", { key: ph.id, style: { position: "relative", paddingTop: "100%", borderRadius: 10, overflow: "hidden", background: "rgba(255,255,255,0.05)", cursor: "pointer" }, onClick: () => navigate("partyDetail", { partyId: ph.partyId, tab: "photos" }) }, /* @__PURE__ */ React.createElement("img", { src: ph.dataUrl, style: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }, alt: "" }), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent,rgba(0,0,0,0.7))", padding: "8px 6px 4px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "rgba(255,255,255,0.8)", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, ph.partyTitle)))))), suggestions.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { margin: "0 16px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 700, marginBottom: 10 } }, "\u{1F465} People You May Know"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, overflowX: "auto", paddingBottom: 8 } }, suggestions.map(({ user, mutualCount }) => /* @__PURE__ */ React.createElement("div", { key: user.id, style: { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, padding: "14px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, minWidth: 120, flexShrink: 0 } }, /* @__PURE__ */ React.createElement(Avatar, { user, size: 50 }), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 13, textAlign: "center", lineHeight: 1.3 } }, user.firstName, " ", user.lastName), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.45)", textAlign: "center" } }, mutualCount, " mutual ", mutualCount === 1 ? "friend" : "friends"), /* @__PURE__ */ React.createElement("button", { onClick: () => { sendFriendRequest(user.id); showHomeToast("Friend request sent! \u{1F44B}"); }, style: { background: "linear-gradient(135deg,#c026d3,#7c3aed)", color: "#fff", border: "none", borderRadius: 20, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", width: "100%" } }, "+ Add"))))), /* @__PURE__ */ React.createElement(BottomNav, { screen: "home", navigate }));
 };
 const EVENT_TYPES = [
-  { id: "party", label: "Party", emoji: "🎊", color: "#c026d3", grad: "linear-gradient(135deg,#c026d3,#7c3aed)", fw: ["#c026d3","#fbbf24","#34d399","#60a5fa","#f87171"] },
-  { id: "birthday", label: "Birthday", emoji: "🎂", color: "#f59e0b", grad: "linear-gradient(135deg,#f59e0b,#ef4444)", fw: ["#f59e0b","#ef4444","#fde68a","#f87171"] },
-  { id: "wedding", label: "Wedding", emoji: "💍", color: "#e879f9", grad: "linear-gradient(135deg,#f9a8d4,#a855f7)", fw: ["#f9a8d4","#ffffff","#e879f9","#a855f7"] },
-  { id: "dinner", label: "Dinner Party", emoji: "🍷", color: "#dc2626", grad: "linear-gradient(135deg,#7f1d1d,#6d28d9)", fw: ["#dc2626","#7c3aed","#fbbf24","#f87171"] },
-  { id: "casual", label: "Casual Hang", emoji: "☀️", color: "#0284c7", grad: "linear-gradient(135deg,#0284c7,#06b6d4)", fw: ["#0284c7","#06b6d4","#34d399","#60a5fa"] },
-  { id: "graduation", label: "Graduation", emoji: "🎓", color: "#1d4ed8", grad: "linear-gradient(135deg,#1d4ed8,#7c3aed)", fw: ["#1d4ed8","#a78bfa","#fbbf24","#ffffff"] },
-  { id: "housewarming", label: "Housewarming", emoji: "🏠", color: "#16a34a", grad: "linear-gradient(135deg,#15803d,#0284c7)", fw: ["#16a34a","#0284c7","#34d399","#fbbf24"] },
-  { id: "halloween", label: "Halloween", emoji: "🎃", color: "#ea580c", grad: "linear-gradient(135deg,#ea580c,#1c1917)", fw: ["#ea580c","#fbbf24","#7c3aed","#f87171"] },
-  { id: "christmas", label: "Christmas", emoji: "🎄", color: "#16a34a", grad: "linear-gradient(135deg,#15803d,#dc2626)", fw: ["#16a34a","#dc2626","#ffffff","#fbbf24"] },
-  { id: "bbq", label: "BBQ", emoji: "🔥", color: "#ea580c", grad: "linear-gradient(135deg,#ea580c,#fbbf24)", fw: ["#ea580c","#fbbf24","#dc2626","#f87171"] },
-  { id: "engagement", label: "Engagement", emoji: "💎", color: "#a78bfa", grad: "linear-gradient(135deg,#a78bfa,#ec4899)", fw: ["#a78bfa","#ec4899","#ffffff","#e879f9"] },
-  { id: "hen_stag", label: "Hen / Stag", emoji: "🥂", color: "#ec4899", grad: "linear-gradient(135deg,#ec4899,#f59e0b)", fw: ["#ec4899","#f59e0b","#ffffff","#fbbf24"] },
+  { id: "party", label: "Party", emoji: "\u{1F38A}", color: "#c026d3", grad: "linear-gradient(135deg,#c026d3,#7c3aed)", fw: ["#c026d3","#fbbf24","#34d399","#60a5fa","#f87171"], font: "'Segoe UI',sans-serif", smartSections: ["what_to_bring","parking"] },
+  { id: "birthday", label: "Birthday", emoji: "\u{1F382}", color: "#f59e0b", grad: "linear-gradient(135deg,#f59e0b,#ef4444)", fw: ["#f59e0b","#ef4444","#fde68a","#f87171"], font: "'Segoe UI',sans-serif", smartSections: ["gift_list","age_milestone","surprise_mode"] },
+  { id: "wedding", label: "Wedding", emoji: "\u{1F48D}", color: "#e879f9", grad: "linear-gradient(135deg,#f9a8d4,#a855f7)", fw: ["#f9a8d4","#ffffff","#e879f9","#a855f7"], font: "Georgia,serif", smartSections: ["registry","accommodation","dress_code","ceremony_times"] },
+  { id: "dinner", label: "Dinner Party", emoji: "\u{1F377}", color: "#dc2626", grad: "linear-gradient(135deg,#7f1d1d,#6d28d9)", fw: ["#dc2626","#7c3aed","#fbbf24","#f87171"], font: "Georgia,serif", smartSections: ["menu_preview","dietary","seating"] },
+  { id: "casual", label: "Casual Hang", emoji: "\u2600\uFE0F", color: "#0284c7", grad: "linear-gradient(135deg,#0284c7,#06b6d4)", fw: ["#0284c7","#06b6d4","#34d399","#60a5fa"], font: "'Segoe UI',sans-serif", smartSections: ["what_to_bring","parking"] },
+  { id: "graduation", label: "Graduation", emoji: "\u{1F393}", color: "#1d4ed8", grad: "linear-gradient(135deg,#1d4ed8,#7c3aed)", fw: ["#1d4ed8","#a78bfa","#fbbf24","#ffffff"], font: "'Segoe UI',sans-serif", smartSections: ["dress_code","gift_list"] },
+  { id: "housewarming", label: "Housewarming", emoji: "\u{1F3E0}", color: "#16a34a", grad: "linear-gradient(135deg,#15803d,#0284c7)", fw: ["#16a34a","#0284c7","#34d399","#fbbf24"], font: "'Segoe UI',sans-serif", smartSections: ["gift_list","what_to_bring","parking"] },
+  { id: "halloween", label: "Halloween", emoji: "\u{1F383}", color: "#ea580c", grad: "linear-gradient(135deg,#ea580c,#1c1917)", fw: ["#ea580c","#fbbf24","#7c3aed","#f87171"], font: "'Creepster',cursive,'Segoe UI',sans-serif", smartSections: ["costume_theme","what_to_bring"] },
+  { id: "christmas", label: "Christmas", emoji: "\u{1F384}", color: "#16a34a", grad: "linear-gradient(135deg,#15803d,#dc2626)", fw: ["#16a34a","#dc2626","#ffffff","#fbbf24"], font: "'Segoe UI',sans-serif", smartSections: ["gift_exchange","secret_santa","dietary"] },
+  { id: "bbq", label: "BBQ", emoji: "\u{1F525}", color: "#ea580c", grad: "linear-gradient(135deg,#ea580c,#fbbf24)", fw: ["#ea580c","#fbbf24","#dc2626","#f87171"], font: "'Segoe UI',sans-serif", smartSections: ["what_to_bring","dietary","parking"] },
+  { id: "engagement", label: "Engagement", emoji: "\u{1F48E}", color: "#a78bfa", grad: "linear-gradient(135deg,#a78bfa,#ec4899)", fw: ["#a78bfa","#ec4899","#ffffff","#e879f9"], font: "Georgia,serif", smartSections: ["registry","dress_code","accommodation"] },
+  { id: "hen_stag", label: "Hen / Stag", emoji: "\u{1F942}", color: "#ec4899", grad: "linear-gradient(135deg,#ec4899,#f59e0b)", fw: ["#ec4899","#f59e0b","#ffffff","#fbbf24"], font: "'Segoe UI',sans-serif", smartSections: ["itinerary","dress_code","cost_split"] },
+  { id: "nye", label: "New Year's Eve", emoji: "\u{1F386}", color: "#7c3aed", grad: "linear-gradient(135deg,#7c3aed,#fbbf24)", fw: ["#fbbf24","#7c3aed","#ffffff","#e879f9"], font: "'Segoe UI',sans-serif", smartSections: ["dress_code","what_to_bring"] },
+  { id: "baby_shower", label: "Baby Shower", emoji: "\u{1F476}", color: "#f9a8d4", grad: "linear-gradient(135deg,#f9a8d4,#93c5fd)", fw: ["#f9a8d4","#93c5fd","#ffffff","#fde68a"], font: "Georgia,serif", smartSections: ["registry","gift_list","dietary"] },
+  { id: "game_night", label: "Game Night", emoji: "\u{1F3B2}", color: "#8b5cf6", grad: "linear-gradient(135deg,#8b5cf6,#06b6d4)", fw: ["#8b5cf6","#06b6d4","#fbbf24","#34d399"], font: "'Segoe UI',sans-serif", smartSections: ["what_to_bring","parking"] },
+  { id: "club_night", label: "Club / Rave", emoji: "\u{1F3B6}", color: "#e879f9", grad: "linear-gradient(135deg,#0f0f0f,#7c3aed)", fw: ["#e879f9","#06b6d4","#fbbf24","#f87171"], font: "'Segoe UI',sans-serif", smartSections: ["dress_code","door_time","tickets"] },
+  { id: "brunch", label: "Brunch", emoji: "\u{1F950}", color: "#f59e0b", grad: "linear-gradient(135deg,#fbbf24,#f59e0b)", fw: ["#f59e0b","#fbbf24","#ffffff","#34d399"], font: "Georgia,serif", smartSections: ["menu_preview","dietary"] },
+  { id: "kids_party", label: "Kids Party", emoji: "\u{1F388}", color: "#ef4444", grad: "linear-gradient(135deg,#ef4444,#fbbf24)", fw: ["#ef4444","#fbbf24","#34d399","#60a5fa"], font: "'Segoe UI',sans-serif", smartSections: ["age_range","allergy_info","parent_contact"] },
 ];
+const SMART_SECTION_LABELS = {
+  what_to_bring: { emoji: "\u{1F6CD}\uFE0F", label: "What to Bring", placeholder: "e.g. BYOB, bring a dish, bring a towel..." },
+  parking: { emoji: "\u{1F17F}\uFE0F", label: "Parking Info", placeholder: "e.g. Street parking available, use the rear car park..." },
+  gift_list: { emoji: "\u{1F381}", label: "Gift List / Wishlist", placeholder: "Link to gift list or describe preferences..." },
+  age_milestone: { emoji: "\u{1F389}", label: "Age / Milestone", placeholder: "e.g. Turning 30!" },
+  surprise_mode: { emoji: "\u{1F92B}", label: "Surprise Party?", placeholder: "Shh! Don't tell them..." },
+  registry: { emoji: "\u{1F4DD}", label: "Registry / Wishlist", placeholder: "Link to registry..." },
+  accommodation: { emoji: "\u{1F3E8}", label: "Accommodation", placeholder: "Nearby hotel or Airbnb details..." },
+  dress_code: { emoji: "\u{1F457}", label: "Dress Code", placeholder: "e.g. Black tie, smart casual, fancy dress..." },
+  ceremony_times: { emoji: "\u23F0", label: "Ceremony / Key Times", placeholder: "e.g. Ceremony at 2pm, reception at 4pm..." },
+  menu_preview: { emoji: "\u{1F37D}\uFE0F", label: "Menu Preview", placeholder: "What's being served..." },
+  dietary: { emoji: "\u{1F957}", label: "Dietary Info", placeholder: "Allergy info, vegan options available..." },
+  seating: { emoji: "\u{1F4BA}", label: "Seating Plan", placeholder: "Assigned seating or free seating..." },
+  costume_theme: { emoji: "\u{1F383}", label: "Costume Theme", placeholder: "e.g. 80s, zombie, superhero..." },
+  gift_exchange: { emoji: "\u{1F381}", label: "Gift Exchange Rules", placeholder: "e.g. Budget \u00A310, Secret Santa draw..." },
+  secret_santa: { emoji: "\u{1F385}", label: "Secret Santa", placeholder: "Budget, rules, who's got who..." },
+  itinerary: { emoji: "\u{1F4CB}", label: "Itinerary", placeholder: "Timeline for the day/weekend..." },
+  cost_split: { emoji: "\u{1F4B7}", label: "Cost Per Person", placeholder: "e.g. \u00A325 per head, Monzo link..." },
+  door_time: { emoji: "\u{1F6AA}", label: "Door / Set Times", placeholder: "Doors open 9pm, main act at 11pm..." },
+  tickets: { emoji: "\u{1F3AB}", label: "Tickets", placeholder: "Link to buy tickets..." },
+  age_range: { emoji: "\u{1F476}", label: "Age Range", placeholder: "e.g. Suitable for 4-8 year olds..." },
+  allergy_info: { emoji: "\u26A0\uFE0F", label: "Allergy Info", placeholder: "e.g. Nut-free venue, face paint ingredients..." },
+  parent_contact: { emoji: "\u{1F4F1}", label: "Parent Contact", placeholder: "Contact number for pick-up/emergencies..." },
+};
 const getEventTheme = (id) => EVENT_TYPES.find((t) => t.id === id) || EVENT_TYPES[0];
 const CreatePartyScreen = () => {
   const { navigate, createParty, currentUser, users } = useApp();
@@ -1123,6 +1175,11 @@ const CreatePartyScreen = () => {
     fireworksStyle: "classic",
     eventType: "party",
     coverImage: null,
+    playlistUrl: "",
+    moodBoard: [],
+    smartSections: {},
+    inviteFont: "",
+    inviteEffect: "auto",
     maxCapacity: "",
     invitedUsers: [],
     dateInput: "",
@@ -1156,8 +1213,38 @@ const CreatePartyScreen = () => {
   const drinkPresets = ["\u{1F942} Champagne", "\u{1F377} Wine", "\u{1F37A} Beer", "\u{1F379} Cocktails", "\u{1F964} Soft Drinks", "\u{1F4A7} Water", "\u{1F943} Spirits", "\u{1F378} Gin", "Custom"];
   const colorPresets = ["#c026d3", "#7c3aed", "#fbbf24", "#34d399", "#60a5fa", "#f87171", "#fb923c", "#ffffff", "#f472b6"];
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const totalSteps = 8;
-  const stepLabels = ["Basics", "Dates", "Location", "Dress Code", "Menu", "Drinks", "Questions", "Invite"];
+  const moodRef = useRef(null);
+  const onMoodImg = (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    const promises = files.map((f) => new Promise((res) => {
+      const r = new FileReader();
+      r.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 600;
+          const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          res(canvas.toDataURL("image/jpeg", 0.7));
+        };
+        img.onerror = () => res(ev.target.result);
+        img.src = ev.target.result;
+      };
+      r.onerror = () => res(null);
+      r.readAsDataURL(f);
+    }));
+    Promise.all(promises).then((imgs) => {
+      const valid = imgs.filter(Boolean);
+      setForm((f) => ({ ...f, moodBoard: [...f.moodBoard, ...valid] }));
+    });
+  };
+  const currentEventType = EVENT_TYPES.find(t => t.id === form.eventType) || EVENT_TYPES[0];
+  const suggestedSections = currentEventType.smartSections || [];
+  const totalSteps = 9;
+  const stepLabels = ["Basics", "Invite Card", "Dates", "Location", "Dress Code", "Menu", "Drinks", "Questions", "Invite"];
   const addDate = () => {
     if (!form.dateInput) return;
     const newDate = { id: uid(), date: form.dateInput, time: form.timeInput, votes: [] };
@@ -1245,7 +1332,55 @@ const CreatePartyScreen = () => {
   const steps = [
     // Step 0: Basics
     /* @__PURE__ */ React.createElement("div", { key: "basics" }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 800, marginBottom: 4 } }, "\u{1F389} Party Basics"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)", marginBottom: 20 } }, "Let's start with the essentials"), React.createElement("div", { style: { marginBottom: 20 } }, React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.6)", marginBottom: 10, letterSpacing: 0.3 } }, "What kind of event?"), React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 } }, EVENT_TYPES.map((t) => React.createElement("div", { key: t.id, onClick: () => set("eventType", t.id), style: { padding: "12px 6px", borderRadius: 14, border: `2px solid ${form.eventType === t.id ? t.color : "rgba(255,255,255,0.1)"}`, background: form.eventType === t.id ? `${t.color}28` : "rgba(255,255,255,0.04)", cursor: "pointer", textAlign: "center", transition: "all 0.2s" } }, React.createElement("div", { style: { fontSize: 24, marginBottom: 4 } }, t.emoji), React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: form.eventType === t.id ? t.color : "rgba(255,255,255,0.6)", lineHeight: 1.2 } }, t.label))))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.6)", marginBottom: 8 } }, "\u{1F5BC}\uFE0F Cover Image (optional)"), /* @__PURE__ */ React.createElement("input", { ref: coverImgRef, type: "file", accept: "image/*", style: { display: "none" }, onChange: onCoverImg }), form.coverImage ? /* @__PURE__ */ React.createElement("div", { style: { position: "relative", borderRadius: 14, overflow: "hidden", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("img", { src: form.coverImage, style: { width: "100%", height: 160, objectFit: "cover", display: "block" }, alt: "Cover" }), /* @__PURE__ */ React.createElement("button", { onClick: () => set("coverImage", null), style: { position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.7)", color: "#fff", border: "none", borderRadius: "50%", width: 28, height: 28, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2715")) : /* @__PURE__ */ React.createElement("button", { className: "btn-secondary", onClick: () => coverImgRef.current?.click(), style: { fontSize: 13 } }, "\u{1F5BC}\uFE0F Upload Cover Image")), /* @__PURE__ */ React.createElement(Input, { label: "Party Name *", placeholder: "e.g. Summer BBQ 2025", value: form.title, onChange: (e) => set("title", e.target.value) }), /* @__PURE__ */ React.createElement(TextArea, { label: "Description", placeholder: "Tell your guests what to expect...", value: form.description, onChange: (e) => set("description", e.target.value) }), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.6)", marginBottom: 8 } }, "Privacy"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, [{ v: true, label: "\u{1F512} Private", desc: "You choose guests" }, { v: false, label: "\u{1F30D} Public", desc: "Anyone can join" }].map((opt) => /* @__PURE__ */ React.createElement("div", { key: opt.v, onClick: () => set("isPrivate", opt.v), style: { flex: 1, padding: "12px", borderRadius: 12, border: `2px solid ${form.isPrivate === opt.v ? "#c026d3" : "rgba(255,255,255,0.15)"}`, background: form.isPrivate === opt.v ? "rgba(192,38,211,0.15)" : "rgba(255,255,255,0.05)", cursor: "pointer", textAlign: "center", transition: "all 0.2s" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 700 } }, opt.label), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 } }, opt.desc))))), !form.isPrivate && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, marginBottom: 14 } }, /* @__PURE__ */ React.createElement(Input, { label: "Max Guests *", type: "number", placeholder: "e.g. 50", value: form.maxCapacity, onChange: (e) => set("maxCapacity", e.target.value), min: "1" }), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: -8 } }, "First come, first served \u2014 once full, no one else can join")), /* @__PURE__ */ React.createElement("div", { className: "card", style: { background: "rgba(192,38,211,0.1)" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700 } }, "\u2728 Invite Fireworks"), /* @__PURE__ */ React.createElement("div", { onClick: () => set("fireworksEnabled", !form.fireworksEnabled), style: { width: 44, height: 24, borderRadius: 12, background: form.fireworksEnabled ? "#c026d3" : "rgba(255,255,255,0.2)", position: "relative", cursor: "pointer", transition: "background 0.2s" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 2, left: form.fireworksEnabled ? 22 : 2, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left 0.2s" } }))), form.fireworksEnabled && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 8 } }, "Pick colours:"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 } }, colorPresets.map((c) => /* @__PURE__ */ React.createElement("div", { key: c, onClick: () => toggleColor(c), style: { width: 32, height: 32, borderRadius: "50%", background: c, border: `3px solid ${form.fireworksColors.includes(c) ? "#fff" : "transparent"}`, cursor: "pointer", boxShadow: form.fireworksColors.includes(c) ? "0 0 0 2px #c026d3" : "none", transition: "all 0.2s" } }))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 10 } }, ["classic", "sparkle", "stars"].map((s) => /* @__PURE__ */ React.createElement("div", { key: s, onClick: () => set("fireworksStyle", s), style: { flex: 1, padding: "8px", borderRadius: 10, border: `2px solid ${form.fireworksStyle === s ? "#c026d3" : "rgba(255,255,255,0.15)"}`, background: form.fireworksStyle === s ? "rgba(192,38,211,0.2)" : "transparent", cursor: "pointer", textAlign: "center", fontSize: 12, fontWeight: 600, transition: "all 0.2s", textTransform: "capitalize" } }, s))), /* @__PURE__ */ React.createElement("button", { className: "btn-secondary", style: { fontSize: 13 }, onClick: () => setShowFireworksPreview(true) }, "\u{1F440} Preview Fireworks")))),
-    // Step 1: Dates
+    // Step 1: Invite Card Customisation
+    /* @__PURE__ */ React.createElement("div", { key: "invitecard" },
+      React.createElement("div", { style: { fontSize: 22, fontWeight: 800, marginBottom: 4 } }, "\u{1F3A8} Invite Card"),
+      React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)", marginBottom: 20 } }, "Customise how your invite looks and feels"),
+      // Playlist
+      React.createElement("div", { style: { marginBottom: 18 } },
+        React.createElement(Input, { label: "\u{1F3B5} Playlist Link (optional)", placeholder: "Paste Spotify or Apple Music link...", value: form.playlistUrl, onChange: (e) => set("playlistUrl", e.target.value) }),
+        React.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.35)" } }, "Guests will see an embedded player on your invite")
+      ),
+      // Mood Board
+      React.createElement("div", { style: { marginBottom: 18 } },
+        React.createElement("div", { style: { fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.6)", marginBottom: 8 } }, "\u{1F4F7} Mood Board (optional)"),
+        React.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.35)", marginBottom: 8 } }, "Add inspo photos \u2014 venue shots, decor ideas, vibe references"),
+        React.createElement("input", { ref: moodRef, type: "file", accept: "image/*", multiple: true, style: { display: "none" }, onChange: onMoodImg }),
+        React.createElement("button", { className: "btn-secondary", onClick: () => moodRef.current?.click(), style: { fontSize: 13, marginBottom: 10 } }, "\u{1F5BC}\uFE0F Upload Mood Board Images"),
+        form.moodBoard.length > 0 && React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 } },
+          form.moodBoard.map((img, i) => React.createElement("div", { key: i, style: { position: "relative", paddingTop: "100%", borderRadius: 8, overflow: "hidden" } },
+            React.createElement("img", { src: img, style: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }, alt: "" }),
+            React.createElement("button", { onClick: () => set("moodBoard", form.moodBoard.filter((_, ii) => ii !== i)), style: { position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", color: "#fff", border: "none", borderRadius: "50%", width: 22, height: 22, fontSize: 12, cursor: "pointer" } }, "\u2715")
+          ))
+        )
+      ),
+      // Invite Effect
+      React.createElement("div", { style: { marginBottom: 18 } },
+        React.createElement("div", { style: { fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.6)", marginBottom: 8 } }, "\u2728 Invite Effect"),
+        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 } },
+          [{ id: "auto", label: "Auto", desc: "Match event type" }, { id: "confetti", label: "Confetti", desc: "Colourful burst" }, { id: "fireworks", label: "Fireworks", desc: "Classic sparkle" }, { id: "bubbles", label: "Bubbles", desc: "Floating bubbles" }, { id: "petals", label: "Petals", desc: "Falling petals" }, { id: "none", label: "None", desc: "Keep it clean" }].map(eff =>
+            React.createElement("div", { key: eff.id, onClick: () => set("inviteEffect", eff.id), style: { padding: "10px 6px", borderRadius: 12, border: `2px solid ${form.inviteEffect === eff.id ? "#c026d3" : "rgba(255,255,255,0.1)"}`, background: form.inviteEffect === eff.id ? "rgba(192,38,211,0.15)" : "rgba(255,255,255,0.04)", cursor: "pointer", textAlign: "center", transition: "all 0.2s" } },
+              React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: form.inviteEffect === eff.id ? "#e879f9" : "#fff" } }, eff.label),
+              React.createElement("div", { style: { fontSize: 9, color: "rgba(255,255,255,0.4)", marginTop: 2 } }, eff.desc)
+            )
+          )
+        )
+      ),
+      // Smart Sections
+      suggestedSections.length > 0 && React.createElement("div", { style: { marginBottom: 18 } },
+        React.createElement("div", { style: { fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.6)", marginBottom: 4 } }, "\u{1F4A1} Suggested Sections"),
+        React.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.35)", marginBottom: 10 } }, "These are recommended for " + currentEventType.label + " events"),
+        suggestedSections.map(secId => {
+          const sec = SMART_SECTION_LABELS[secId];
+          if (!sec) return null;
+          return React.createElement("div", { key: secId, style: { marginBottom: 10 } },
+            React.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.7)", marginBottom: 4 } }, sec.emoji, " ", sec.label),
+            React.createElement("textarea", { className: "input-field", style: { resize: "vertical", minHeight: 50, fontSize: 13 }, placeholder: sec.placeholder, value: form.smartSections[secId] || "", onChange: (e) => setForm(f => ({ ...f, smartSections: { ...f.smartSections, [secId]: e.target.value } })) })
+          );
+        })
+      )
+    ),
+    // Step 2: Dates
     /* @__PURE__ */ React.createElement("div", { key: "dates" }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 800, marginBottom: 4 } }, "\u{1F4C5} Date Options"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)", marginBottom: 20 } }, "Add one or multiple dates for guests to vote on"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } }, [{ v: false, label: "\u{1F5F3}\uFE0F Let guests vote" }, { v: true, label: "\u2705 Single confirmed date" }].map((opt) => /* @__PURE__ */ React.createElement("div", { key: opt.v, onClick: () => set("useSingleDate", opt.v), style: { flex: 1, padding: "10px", borderRadius: 12, border: `2px solid ${form.useSingleDate === opt.v ? "#c026d3" : "rgba(255,255,255,0.15)"}`, background: form.useSingleDate === opt.v ? "rgba(192,38,211,0.15)" : "rgba(255,255,255,0.05)", cursor: "pointer", textAlign: "center", fontSize: 12, fontWeight: 600, transition: "all 0.2s" } }, opt.label))), /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ React.createElement(Input, { label: "Date", type: "date", value: form.dateInput, onChange: (e) => set("dateInput", e.target.value), style: { marginBottom: 0 } }), /* @__PURE__ */ React.createElement(Input, { label: "Time", type: "time", value: form.timeInput, onChange: (e) => set("timeInput", e.target.value), style: { marginBottom: 0 } })), /* @__PURE__ */ React.createElement("button", { className: "btn-secondary", onClick: addDate, style: { fontSize: 14 } }, "+ Add ", form.useSingleDate ? "Date" : "Date Option")), form.dates.map((d) => /* @__PURE__ */ React.createElement("div", { key: d.id, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "rgba(192,38,211,0.1)", borderRadius: 10, marginBottom: 8, border: "1px solid rgba(192,38,211,0.3)" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14 } }, "\u{1F4C5} ", fmtDate(d.date), " ", d.time && `at ${d.time}`), /* @__PURE__ */ React.createElement("button", { onClick: () => removeDate(d.id), style: { background: "rgba(248,113,113,0.2)", color: "#f87171", border: "none", borderRadius: 8, padding: "4px 10px", fontSize: 12, cursor: "pointer" } }, "\u2715"))), form.dates.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: 14, padding: 20 } }, "No dates added yet")),
     // Step 2: Location
     /* @__PURE__ */ React.createElement("div", { key: "location" }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 800, marginBottom: 4 } }, "\u{1F4CD} Location"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)", marginBottom: 16 } }, "Search or tap the map to drop your venue pin"), /* @__PURE__ */ React.createElement(
@@ -1309,6 +1444,7 @@ const CreatePartyScreen = () => {
     true,
     true,
     true,
+    true,
     true
   ];
   return /* @__PURE__ */ React.createElement("div", { className: "screen", style: { background: "linear-gradient(180deg,#0d0019 0%,#1a003a 100%)" } }, toast && /* @__PURE__ */ React.createElement(Toast, { msg: toast.msg, type: toast.type }), showFireworksPreview && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 200 }, onClick: () => setShowFireworksPreview(false) }, /* @__PURE__ */ React.createElement(FireworksCanvas, { colors: form.fireworksColors, duration: 3e3, onDone: () => setShowFireworksPreview(false) }), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 80, left: 0, right: 0, textAlign: "center", color: "#fff", fontSize: 16, fontWeight: 700 } }, "Tap to close preview")), /* @__PURE__ */ React.createElement("div", { style: { padding: "50px 20px 16px", background: "rgba(13,0,25,0.9)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.08)", position: "sticky", top: 0, zIndex: 50 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => navigate("home"), style: { background: "rgba(255,255,255,0.08)", border: "none", color: "#fff", borderRadius: 10, width: 36, height: 36, fontSize: 18, cursor: "pointer" } }, "\u2190"), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 800, fontSize: 18 } }, "Host a Party")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4 } }, stepLabels.map((l, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { flex: 1, height: 4, borderRadius: 2, background: i <= step ? "linear-gradient(90deg,#c026d3,#7c3aed)" : "rgba(255,255,255,0.1)", transition: "background 0.3s" } }))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 6 } }, "Step ", step + 1, " of ", totalSteps, ": ", stepLabels[step])), /* @__PURE__ */ React.createElement("div", { style: { padding: "20px 20px 120px" } }, /* @__PURE__ */ React.createElement("div", { style: { animation: "fadeIn 0.3s ease" }, key: step }, steps[step])), /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, padding: "12px 20px", background: "rgba(13,0,25,0.95)", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", gap: 10 } }, step > 0 && /* @__PURE__ */ React.createElement("button", { className: "btn-secondary", style: { flex: "0 0 auto", width: 100 }, onClick: () => setStep((s) => s - 1) }, "\u2190 Back"), step < totalSteps - 1 ? /* @__PURE__ */ React.createElement("button", { className: "btn-primary", style: { flex: 1, opacity: canNext[step] ? 1 : 0.5 }, onClick: () => {
@@ -1316,7 +1452,7 @@ const CreatePartyScreen = () => {
   } }, "Next \u2192") : /* @__PURE__ */ React.createElement("button", { className: "btn-primary", style: { flex: 1, background: "linear-gradient(135deg,#16a34a,#15803d)" }, onClick: handleCreate }, "\u{1F389} Create Party!")));
 };
 const InvitationScreen = () => {
-  const { screenData, navigate, currentUser, getParty, getUser, respondToInvite, getMyInvite } = useApp();
+  const { screenData, navigate, currentUser, getParty, getUser, respondToInvite, getMyInvite, trackInviteView } = useApp();
   const party = getParty(screenData?.partyId);
   const host = party ? getUser(party.hostId) : null;
   const myInvite = party ? getMyInvite(party.id) : null;
@@ -1324,6 +1460,7 @@ const InvitationScreen = () => {
   const [showFireworks, setShowFireworks] = useState(true);
   const [showCoverReveal, setShowCoverReveal] = useState(!!(party?.coverImage));
   const [showParticles, setShowParticles] = useState(false);
+  const [showRsvpCelebration, setShowRsvpCelebration] = useState(false);
   const [rsvp, setRsvp] = useState(myInvite?.status || "");
   const [cancelReason, setCancelReason] = useState("");
   const [selectedDates, setSelectedDates] = useState(myInvite?.dateVotes || []);
@@ -1334,6 +1471,13 @@ const InvitationScreen = () => {
   const [answers, setAnswers] = useState(myInvite?.answers || {});
   const [hostQuestion, setHostQuestion] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [moodExpanded, setMoodExpanded] = useState(false);
+
+  // Track invite view
+  useEffect(() => {
+    if (party && trackInviteView) trackInviteView(party.id);
+  }, []);
+
   useEffect(() => {
     if (showCoverReveal) {
       const t = setTimeout(() => setShowCoverReveal(false), 1800);
@@ -1346,16 +1490,49 @@ const InvitationScreen = () => {
       return () => clearTimeout(t);
     }
   }, [showCoverReveal, step]);
-  if (!party || !host) return /* @__PURE__ */ React.createElement("div", { style: { height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 48, marginBottom: 12 } }, "\u{1F615}"), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, marginBottom: 8 } }, "Party not found"), /* @__PURE__ */ React.createElement("button", { className: "btn-primary", style: { width: 160 }, onClick: () => navigate("home") }, "Go Home"));
+  if (!party || !host) return React.createElement("div", { style: { height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center" } }, React.createElement("div", { style: { fontSize: 48, marginBottom: 12 } }, "\u{1F615}"), React.createElement("div", { style: { fontWeight: 700, marginBottom: 8 } }, "Party not found"), React.createElement("button", { className: "btn-primary", style: { width: 160 }, onClick: () => navigate("home") }, "Go Home"));
   const fw = party.fireworks || {};
   const eventTheme = getEventTheme(party.eventType);
   const fireworksColors = fw.colors || eventTheme.fw || ["#c026d3", "#fbbf24", "#34d399", "#60a5fa"];
   const inviteEmoji = eventTheme.emoji || "\u{1F389}";
+  const themeFont = party.inviteFont || eventTheme.font || "'Segoe UI',sans-serif";
   const hasDates = party.dates && party.dates.length > 0;
   const hasQuestions = party.customQuestions && party.customQuestions.length > 0;
   const hasDrinks = party.askDrinkPref && party.drinkOptions && party.drinkOptions.length > 0;
+  const hasPlaylist = !!(party.playlistUrl);
+  const hasMoodBoard = party.moodBoard && party.moodBoard.length > 0;
+  const hasSmartSections = party.smartSections && Object.keys(party.smartSections).some(k => party.smartSections[k]);
   const dateStr = party.confirmedDate ? fmtDate(party.confirmedDate.date) : hasDates ? "Multiple dates" : "Date TBD";
+  const guestName = currentUser ? currentUser.firstName : "Friend";
   const toggleDate = (id) => setSelectedDates((p) => p.includes(id) ? p.filter((d) => d !== id) : [...p, id]);
+
+  // Build Spotify/Apple Music embed URL
+  const getEmbedUrl = (url) => {
+    if (!url) return null;
+    // Spotify
+    const spotifyMatch = url.match(/open\.spotify\.com\/(playlist|album|track)\/([a-zA-Z0-9]+)/);
+    if (spotifyMatch) return `https://open.spotify.com/embed/${spotifyMatch[1]}/${spotifyMatch[2]}?theme=0`;
+    // Apple Music
+    const appleMatch = url.match(/music\.apple\.com\/([a-z]{2})\/(album|playlist)\/[^/]+\/([a-z0-9.\-]+)/i);
+    if (appleMatch) return `https://embed.music.apple.com/${appleMatch[1]}/${appleMatch[2]}/${appleMatch[3]}`;
+    return null;
+  };
+  const embedUrl = getEmbedUrl(party.playlistUrl);
+
+  // Themed background based on event type
+  const getThemedBackground = () => {
+    switch (party.eventType) {
+      case "wedding": return "linear-gradient(180deg,#1a0020 0%,#2d1b3d 30%,#1a0020 100%)";
+      case "halloween": return "linear-gradient(180deg,#0a0a0a 0%,#1c0a00 50%,#0a0a0a 100%)";
+      case "christmas": return "linear-gradient(180deg,#0a1a0a 0%,#1a0000 50%,#0a1a0a 100%)";
+      case "club_night": return "linear-gradient(180deg,#000000 0%,#0a001a 50%,#000000 100%)";
+      case "brunch": return "linear-gradient(180deg,#1a1200 0%,#1a0a00 50%,#0d0019 100%)";
+      case "baby_shower": return "linear-gradient(180deg,#1a0020 0%,#001a2d 50%,#1a0020 100%)";
+      case "nye": return "linear-gradient(180deg,#000000 0%,#1a0030 50%,#000000 100%)";
+      default: return "linear-gradient(180deg,#0d0019 0%,#1a003a 100%)";
+    }
+  };
+
   const handleSubmit = () => {
     respondToInvite(party.id, {
       status: rsvp,
@@ -1392,40 +1569,178 @@ const InvitationScreen = () => {
   const isLast = step >= steps.length - 1;
   const isSecondLast = step === steps.length - 2;
   const goNext = () => {
-    if (isSecondLast) handleSubmit();
+    if (isSecondLast) {
+      handleSubmit();
+      if (rsvp === "accepted") {
+        setShowRsvpCelebration(true);
+        setTimeout(() => setShowRsvpCelebration(false), 3500);
+      }
+    }
     setStep((s) => Math.min(s + 1, steps.length - 1));
   };
   const goBack = () => setStep((s) => Math.max(s - 1, 1));
   const renderStep = () => {
     switch (currentStep) {
       case "fireworks":
-        return /* @__PURE__ */ React.createElement("div", { style: { height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 24, position: "relative" } }, showCoverReveal && party.coverImage && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 1000, animation: "coverReveal 1.2s ease-out forwards" } }, /* @__PURE__ */ React.createElement("img", { src: party.coverImage, style: { width: "100%", height: "100%", objectFit: "cover" }, alt: "" })), !showCoverReveal && showParticles && /* @__PURE__ */ React.createElement(EventParticles, { eventType: party.eventType, onDone: () => setShowParticles(false) }), !showCoverReveal && showFireworks && fw.enabled !== false && /* @__PURE__ */ React.createElement(FireworksCanvas, { colors: fireworksColors, duration: 3500, onDone: () => setShowFireworks(false) }), /* @__PURE__ */ React.createElement("div", { style: { position: "relative", zIndex: 10, animation: "pop 0.6s ease", opacity: showCoverReveal ? 0 : 1, transition: "opacity 0.5s ease" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 76, marginBottom: 16, animation: "float 2s ease-in-out infinite" } }, inviteEmoji), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: 2, marginBottom: 6 } }, "YOU'VE BEEN INVITED!"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 30, fontWeight: 900, marginBottom: 6 } }, "to ", host.firstName, "'s"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 26, fontWeight: 800, color: "#e879f9", marginBottom: 14 } }, party.title), party.description && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "rgba(255,255,255,0.6)", marginBottom: 10, maxWidth: 290, lineHeight: 1.6 } }, party.description), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.45)", marginBottom: 28 } }, "\u{1F4C5} ", dateStr), /* @__PURE__ */ React.createElement("button", { className: "btn-primary", style: { width: 210, fontSize: 16 }, onClick: () => setStep(1) }, "View My Invite \u{1F38A}")));
+        return React.createElement("div", { style: { height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 24, position: "relative" } },
+          showCoverReveal && party.coverImage && React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 1000, animation: "coverReveal 1.2s ease-out forwards" } }, React.createElement("img", { src: party.coverImage, style: { width: "100%", height: "100%", objectFit: "cover" }, alt: "" })),
+          !showCoverReveal && showParticles && React.createElement(EventParticles, { eventType: party.eventType, onDone: () => setShowParticles(false) }),
+          !showCoverReveal && showFireworks && fw.enabled !== false && React.createElement(FireworksCanvas, { colors: fireworksColors, duration: 3500, onDone: () => setShowFireworks(false) }),
+          React.createElement("div", { style: { position: "relative", zIndex: 10, animation: "pop 0.6s ease", opacity: showCoverReveal ? 0 : 1, transition: "opacity 0.5s ease", fontFamily: themeFont } },
+            React.createElement("div", { style: { fontSize: 76, marginBottom: 16, animation: "float 2s ease-in-out infinite" } }, inviteEmoji),
+            // Personalised greeting
+            React.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: eventTheme.color, letterSpacing: 1, marginBottom: 6, animation: "fadeIn 0.8s ease" } }, "Hey " + guestName + "!"),
+            React.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: 2, marginBottom: 6 } }, "YOU'VE BEEN INVITED"),
+            React.createElement("div", { style: { fontSize: 30, fontWeight: 900, marginBottom: 6 } }, "to ", host.firstName, "'s"),
+            React.createElement("div", { style: { fontSize: 26, fontWeight: 800, color: eventTheme.color, marginBottom: 14 } }, party.title),
+            party.description && React.createElement("div", { style: { fontSize: 15, color: "rgba(255,255,255,0.6)", marginBottom: 10, maxWidth: 290, lineHeight: 1.6, margin: "0 auto 10px" } }, party.description),
+            React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.45)", marginBottom: 8 } }, "\u{1F4C5} ", dateStr),
+            // Live countdown on invite
+            (party.confirmedDate || (party.dates && party.dates.length > 0)) && React.createElement("div", { style: { marginBottom: 20 } },
+              React.createElement(Countdown, { dateStr: party.confirmedDate?.date || party.dates?.[0]?.date, timeStr: party.confirmedDate?.time || party.dates?.[0]?.time })
+            ),
+            // Smart sections preview
+            hasSmartSections && React.createElement("div", { style: { marginBottom: 16, maxWidth: 300, margin: "0 auto 16px" } },
+              Object.entries(party.smartSections).filter(([k,v]) => v).slice(0, 3).map(([key, val]) => {
+                const sec = SMART_SECTION_LABELS[key];
+                return sec ? React.createElement("div", { key, style: { fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 4 } }, sec.emoji, " ", sec.label, ": ", val.length > 60 ? val.slice(0, 60) + "..." : val) : null;
+              })
+            ),
+            // Mood board preview
+            hasMoodBoard && React.createElement("div", { style: { marginBottom: 16 } },
+              React.createElement("div", { style: { display: "flex", gap: 4, justifyContent: "center" } },
+                party.moodBoard.slice(0, 3).map((img, i) => React.createElement("div", { key: i, style: { width: 60, height: 60, borderRadius: 8, overflow: "hidden", border: "1px solid rgba(255,255,255,0.15)" } },
+                  React.createElement("img", { src: img, style: { width: "100%", height: "100%", objectFit: "cover" }, alt: "" })
+                ))
+              ),
+              party.moodBoard.length > 3 && React.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 4 } }, "+" + (party.moodBoard.length - 3) + " more")
+            ),
+            React.createElement("button", { className: "btn-primary", style: { width: 210, fontSize: 16 }, onClick: () => setStep(1) }, "View My Invite \u{1F38A}")
+          )
+        );
       case "rsvp":
-        return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginBottom: 24 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 46, marginBottom: 10 } }, "\u{1F39F}\uFE0F"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 900, marginBottom: 4 } }, party.title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "rgba(255,255,255,0.5)" } }, "Hosted by ", host.firstName, " ", host.lastName), party.location?.address && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.4)", marginTop: 4 } }, "\u{1F4CD} ", party.location.address)), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: 1, marginBottom: 10 } }, "CAN YOU MAKE IT?"), [{ v: "accepted", icon: "\u2705", label: "Yes, I'm coming!", desc: "Count me in!", color: "#34d399" }, { v: "maybe", icon: "\u{1F914}", label: "Maybe...", desc: "I'll let you know", color: "#fbbf24" }, { v: "declined", icon: "\u274C", label: "Sorry, can't make it", desc: "I have a conflict", color: "#f87171" }].map((opt) => /* @__PURE__ */ React.createElement("div", { key: opt.v, onClick: () => setRsvp(opt.v), style: { padding: "14px 16px", borderRadius: 14, border: `2px solid ${rsvp === opt.v ? opt.color : "rgba(255,255,255,0.12)"}`, background: rsvp === opt.v ? `${opt.color}18` : "rgba(255,255,255,0.04)", cursor: "pointer", display: "flex", alignItems: "center", gap: 14, marginBottom: 10, transition: "all 0.2s" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 26 } }, opt.icon), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: rsvp === opt.v ? opt.color : "#fff" } }, opt.label), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 1 } }, opt.desc)), rsvp === opt.v && /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", width: 20, height: 20, borderRadius: "50%", background: opt.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 } }, "\u2713")))));
+        return React.createElement("div", { style: { fontFamily: themeFont } },
+          React.createElement("div", { style: { textAlign: "center", marginBottom: 24 } },
+            React.createElement("div", { style: { fontSize: 46, marginBottom: 10 } }, "\u{1F39F}\uFE0F"),
+            React.createElement("div", { style: { fontSize: 22, fontWeight: 900, marginBottom: 4 } }, party.title),
+            React.createElement("div", { style: { fontSize: 15, color: "rgba(255,255,255,0.5)" } }, "Hosted by ", host.firstName, " ", host.lastName),
+            party.location?.address && React.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.4)", marginTop: 4 } }, "\u{1F4CD} ", party.location.address),
+            // Countdown on RSVP page too
+            (party.confirmedDate || (party.dates && party.dates.length > 0)) && React.createElement("div", { style: { marginTop: 12 } },
+              React.createElement(Countdown, { dateStr: party.confirmedDate?.date || party.dates?.[0]?.date, timeStr: party.confirmedDate?.time || party.dates?.[0]?.time })
+            )
+          ),
+          // Embedded playlist player
+          embedUrl && React.createElement("div", { style: { marginBottom: 16, borderRadius: 12, overflow: "hidden", border: "1px solid rgba(255,255,255,0.1)" } },
+            React.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.5)", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 } }, "\u{1F3B5} Party Vibes"),
+            React.createElement("iframe", { src: embedUrl, width: "100%", height: 80, frameBorder: "0", allow: "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture", loading: "lazy", style: { borderRadius: 8 } })
+          ),
+          // Mood board gallery
+          hasMoodBoard && React.createElement("div", { style: { marginBottom: 16 } },
+            React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.5)", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" } },
+              React.createElement("span", null, "\u{1F5BC}\uFE0F Mood Board"),
+              party.moodBoard.length > 3 && React.createElement("button", { onClick: () => setMoodExpanded(!moodExpanded), style: { background: "none", border: "none", color: eventTheme.color, fontSize: 12, fontWeight: 600, cursor: "pointer" } }, moodExpanded ? "Show less" : "View all " + party.moodBoard.length)
+            ),
+            React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 } },
+              (moodExpanded ? party.moodBoard : party.moodBoard.slice(0, 3)).map((img, i) => React.createElement("div", { key: i, style: { paddingTop: "100%", position: "relative", borderRadius: 10, overflow: "hidden", border: "1px solid rgba(255,255,255,0.1)" } },
+                React.createElement("img", { src: img, style: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }, alt: "" })
+              ))
+            )
+          ),
+          // Smart sections display
+          hasSmartSections && React.createElement("div", { style: { marginBottom: 16 } },
+            Object.entries(party.smartSections).filter(([k,v]) => v).map(([key, val]) => {
+              const sec = SMART_SECTION_LABELS[key];
+              if (!sec) return null;
+              return React.createElement("div", { key, className: "card", style: { marginBottom: 8, padding: "10px 14px", background: "rgba(255,255,255,0.04)" } },
+                React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: eventTheme.color, marginBottom: 4 } }, sec.emoji, " ", sec.label),
+                React.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.5 } }, val)
+              );
+            })
+          ),
+          React.createElement("div", { style: { marginBottom: 10 } },
+            React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: 1, marginBottom: 10 } }, "CAN YOU MAKE IT?"),
+            [{ v: "accepted", icon: "\u2705", label: "Yes, I'm coming!", desc: "Count me in!", color: "#34d399" }, { v: "maybe", icon: "\u{1F914}", label: "Maybe...", desc: "I'll let you know", color: "#fbbf24" }, { v: "declined", icon: "\u274C", label: "Sorry, can't make it", desc: "I have a conflict", color: "#f87171" }].map((opt) => React.createElement("div", { key: opt.v, onClick: () => setRsvp(opt.v), style: { padding: "14px 16px", borderRadius: 14, border: `2px solid ${rsvp === opt.v ? opt.color : "rgba(255,255,255,0.12)"}`, background: rsvp === opt.v ? `${opt.color}18` : "rgba(255,255,255,0.04)", cursor: "pointer", display: "flex", alignItems: "center", gap: 14, marginBottom: 10, transition: "all 0.2s" } },
+              React.createElement("span", { style: { fontSize: 26 } }, opt.icon),
+              React.createElement("div", null,
+                React.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: rsvp === opt.v ? opt.color : "#fff" } }, opt.label),
+                React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 1 } }, opt.desc)
+              ),
+              rsvp === opt.v && React.createElement("div", { style: { marginLeft: "auto", width: 20, height: 20, borderRadius: "50%", background: opt.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 } }, "\u2713")
+            ))
+          )
+        );
       case "cancel_reason":
-        return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginBottom: 24 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 46, marginBottom: 10 } }, "\u{1F614}"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 900, marginBottom: 4 } }, "Sorry you can't make it"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)" } }, "Would you like to let ", host.firstName, " know why?")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 } }, ["I have a prior commitment", "I'm not feeling well", "It's too far to travel", "Work/school clash", "Family commitment", "Another reason"].map((r) => /* @__PURE__ */ React.createElement("div", { key: r, onClick: () => setCancelReason(r), style: { padding: "13px 16px", borderRadius: 12, border: `2px solid ${cancelReason === r ? "#f87171" : "rgba(255,255,255,0.12)"}`, background: cancelReason === r ? "rgba(248,113,113,0.12)" : "rgba(255,255,255,0.04)", cursor: "pointer", fontSize: 14, fontWeight: 500, display: "flex", justifyContent: "space-between", alignItems: "center", transition: "all 0.2s" } }, r, cancelReason === r && /* @__PURE__ */ React.createElement("span", { style: { color: "#f87171", fontSize: 16 } }, "\u2713")))), /* @__PURE__ */ React.createElement(TextArea, { placeholder: "Or add your own reason (optional)...", value: cancelReason.startsWith("Another") || !["I have a prior commitment", "I'm not feeling well", "It's too far to travel", "Work/school clash", "Family commitment"].includes(cancelReason) ? cancelReason : "", onChange: (e) => setCancelReason(e.target.value), style: { marginBottom: 0 } }), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.35)", textAlign: "center", marginTop: 8 } }, "This is optional \u2014 tap Next to skip"));
+        return React.createElement("div", null, React.createElement("div", { style: { textAlign: "center", marginBottom: 24 } }, React.createElement("div", { style: { fontSize: 46, marginBottom: 10 } }, "\u{1F614}"), React.createElement("div", { style: { fontSize: 22, fontWeight: 900, marginBottom: 4 } }, "Sorry you can't make it"), React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)" } }, "Would you like to let ", host.firstName, " know why?")), React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 } }, ["I have a prior commitment", "I'm not feeling well", "It's too far to travel", "Work/school clash", "Family commitment", "Another reason"].map((r) => React.createElement("div", { key: r, onClick: () => setCancelReason(r), style: { padding: "13px 16px", borderRadius: 12, border: `2px solid ${cancelReason === r ? "#f87171" : "rgba(255,255,255,0.12)"}`, background: cancelReason === r ? "rgba(248,113,113,0.12)" : "rgba(255,255,255,0.04)", cursor: "pointer", fontSize: 14, fontWeight: 500, display: "flex", justifyContent: "space-between", alignItems: "center", transition: "all 0.2s" } }, r, cancelReason === r && React.createElement("span", { style: { color: "#f87171", fontSize: 16 } }, "\u2713")))), React.createElement(TextArea, { placeholder: "Or add your own reason (optional)...", value: cancelReason.startsWith("Another") || !["I have a prior commitment", "I'm not feeling well", "It's too far to travel", "Work/school clash", "Family commitment"].includes(cancelReason) ? cancelReason : "", onChange: (e) => setCancelReason(e.target.value), style: { marginBottom: 0 } }), React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.35)", textAlign: "center", marginTop: 8 } }, "This is optional \u2014 tap Next to skip"));
       case "dates":
-        return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 46, marginBottom: 10 } }, "\u{1F4C5}"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 900, marginBottom: 4 } }, "Which dates work?"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)" } }, "Select all that suit you \u2014 ", host.firstName, " will pick the best one")), party.dates.map((d) => /* @__PURE__ */ React.createElement("div", { key: d.id, onClick: () => toggleDate(d.id), style: { padding: "14px 16px", borderRadius: 14, border: `2px solid ${selectedDates.includes(d.id) ? "#c026d3" : "rgba(255,255,255,0.12)"}`, background: selectedDates.includes(d.id) ? "rgba(192,38,211,0.15)" : "rgba(255,255,255,0.04)", cursor: "pointer", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center", transition: "all 0.2s" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 15 } }, "\u{1F4C5} ", fmtDate(d.date)), d.time && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 3 } }, "\u{1F550} ", d.time)), /* @__PURE__ */ React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", border: `2px solid ${selectedDates.includes(d.id) ? "#c026d3" : "rgba(255,255,255,0.25)"}`, background: selectedDates.includes(d.id) ? "#c026d3" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, transition: "all 0.2s", flexShrink: 0 } }, selectedDates.includes(d.id) ? "\u2713" : ""))), selectedDates.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 13, marginTop: 4 } }, "Tap a date to select it"));
+        return React.createElement("div", null, React.createElement("div", { style: { textAlign: "center", marginBottom: 20 } }, React.createElement("div", { style: { fontSize: 46, marginBottom: 10 } }, "\u{1F4C5}"), React.createElement("div", { style: { fontSize: 22, fontWeight: 900, marginBottom: 4 } }, "Which dates work?"), React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)" } }, "Select all that suit you \u2014 ", host.firstName, " will pick the best one")), party.dates.map((d) => React.createElement("div", { key: d.id, onClick: () => toggleDate(d.id), style: { padding: "14px 16px", borderRadius: 14, border: `2px solid ${selectedDates.includes(d.id) ? "#c026d3" : "rgba(255,255,255,0.12)"}`, background: selectedDates.includes(d.id) ? "rgba(192,38,211,0.15)" : "rgba(255,255,255,0.04)", cursor: "pointer", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center", transition: "all 0.2s" } }, React.createElement("div", null, React.createElement("div", { style: { fontWeight: 700, fontSize: 15 } }, "\u{1F4C5} ", fmtDate(d.date)), d.time && React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 3 } }, "\u{1F550} ", d.time)), React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", border: `2px solid ${selectedDates.includes(d.id) ? "#c026d3" : "rgba(255,255,255,0.25)"}`, background: selectedDates.includes(d.id) ? "#c026d3" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, transition: "all 0.2s", flexShrink: 0 } }, selectedDates.includes(d.id) ? "\u2713" : ""))), selectedDates.length === 0 && React.createElement("div", { style: { textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 13, marginTop: 4 } }, "Tap a date to select it"));
       case "plus_one":
-        return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginBottom: 24 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 46, marginBottom: 10 } }, "\u{1F46B}"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 900, marginBottom: 4 } }, "Bringing a Plus One?"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)", lineHeight: 1.6 } }, "Let ", host.firstName, " know if you'd like to bring someone \u2014 they'll need to approve it")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, marginBottom: 16 } }, [{ v: "yes", icon: "\u{1F46B}", label: "Yes please!", color: "#34d399" }, { v: "no", icon: "\u{1F64B}", label: "Just me", color: "#c026d3" }].map((opt) => /* @__PURE__ */ React.createElement("div", { key: opt.v, onClick: () => setPlusOne(opt.v), style: { flex: 1, padding: "18px 12px", borderRadius: 16, border: `2px solid ${plusOne === opt.v ? opt.color : "rgba(255,255,255,0.12)"}`, background: plusOne === opt.v ? `${opt.color}18` : "rgba(255,255,255,0.04)", cursor: "pointer", textAlign: "center", transition: "all 0.2s" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, opt.icon), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: plusOne === opt.v ? opt.color : "#fff" } }, opt.label)))), plusOne === "yes" && /* @__PURE__ */ React.createElement("div", { style: { animation: "fadeIn 0.3s ease" } }, /* @__PURE__ */ React.createElement(Input, { label: "Your plus one's name", placeholder: "e.g. Alex Smith", value: plusOneName, onChange: (e) => setPlusOneName(e.target.value) }), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", textAlign: "center", marginTop: 4 } }, "Your request will be sent to ", host.firstName, " for approval \u{1F64F}")));
+        return React.createElement("div", null, React.createElement("div", { style: { textAlign: "center", marginBottom: 24 } }, React.createElement("div", { style: { fontSize: 46, marginBottom: 10 } }, "\u{1F46B}"), React.createElement("div", { style: { fontSize: 22, fontWeight: 900, marginBottom: 4 } }, "Bringing a Plus One?"), React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)", lineHeight: 1.6 } }, "Let ", host.firstName, " know if you'd like to bring someone \u2014 they'll need to approve it")), React.createElement("div", { style: { display: "flex", gap: 10, marginBottom: 16 } }, [{ v: "yes", icon: "\u{1F46B}", label: "Yes please!", color: "#34d399" }, { v: "no", icon: "\u{1F64B}", label: "Just me", color: "#c026d3" }].map((opt) => React.createElement("div", { key: opt.v, onClick: () => setPlusOne(opt.v), style: { flex: 1, padding: "18px 12px", borderRadius: 16, border: `2px solid ${plusOne === opt.v ? opt.color : "rgba(255,255,255,0.12)"}`, background: plusOne === opt.v ? `${opt.color}18` : "rgba(255,255,255,0.04)", cursor: "pointer", textAlign: "center", transition: "all 0.2s" } }, React.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, opt.icon), React.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: plusOne === opt.v ? opt.color : "#fff" } }, opt.label)))), plusOne === "yes" && React.createElement("div", { style: { animation: "fadeIn 0.3s ease" } }, React.createElement(Input, { label: "Your plus one's name", placeholder: "e.g. Alex Smith", value: plusOneName, onChange: (e) => setPlusOneName(e.target.value) }), React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", textAlign: "center", marginTop: 4 } }, "Your request will be sent to ", host.firstName, " for approval \u{1F64F}")));
       case "dietary":
-        return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 46, marginBottom: 10 } }, "\u{1F957}"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 900, marginBottom: 4 } }, "Dietary Requirements"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)" } }, "Help ", host.firstName, " cater for you")), party.menu?.items?.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginBottom: 16, background: "rgba(255,255,255,0.05)" } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, marginBottom: 8 } }, "\u{1F37D}\uFE0F Menu Preview"), party.menu.items.map((item, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { fontSize: 13, color: "rgba(255,255,255,0.7)", padding: "3px 0" } }, "\u2022 ", item)), party.menu.dietary && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, fontSize: 12, color: "rgba(255,255,255,0.5)", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 8 } }, "\u2139\uFE0F ", party.menu.dietary)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 } }, ["Vegetarian \u{1F955}", "Vegan \u{1F331}", "Gluten-free \u{1F33E}", "Dairy-free \u{1F95B}", "Nut allergy \u{1F95C}", "Halal \u2705", "Kosher \u2721\uFE0F", "No restrictions \u{1F60A}"].map((d) => /* @__PURE__ */ React.createElement("div", { key: d, onClick: () => setDietary((prev) => prev === d ? "" : d), style: { padding: "7px 14px", borderRadius: 20, border: `2px solid ${dietary === d ? "#34d399" : "rgba(255,255,255,0.15)"}`, background: dietary === d ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.05)", cursor: "pointer", fontSize: 13, fontWeight: 500, transition: "all 0.2s" } }, d))), /* @__PURE__ */ React.createElement(TextArea, { placeholder: "Or describe your requirements in detail...", value: ["Vegetarian \u{1F955}", "Vegan \u{1F331}", "Gluten-free \u{1F33E}", "Dairy-free \u{1F95B}", "Nut allergy \u{1F95C}", "Halal \u2705", "Kosher \u2721\uFE0F", "No restrictions \u{1F60A}"].includes(dietary) ? "" : dietary, onChange: (e) => setDietary(e.target.value) }));
+        return React.createElement("div", null, React.createElement("div", { style: { textAlign: "center", marginBottom: 20 } }, React.createElement("div", { style: { fontSize: 46, marginBottom: 10 } }, "\u{1F957}"), React.createElement("div", { style: { fontSize: 22, fontWeight: 900, marginBottom: 4 } }, "Dietary Requirements"), React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)" } }, "Help ", host.firstName, " cater for you")), party.menu?.items?.length > 0 && React.createElement("div", { className: "card", style: { marginBottom: 16, background: "rgba(255,255,255,0.05)" } }, React.createElement("div", { style: { fontWeight: 700, marginBottom: 8 } }, "\u{1F37D}\uFE0F Menu Preview"), party.menu.items.map((item, i) => React.createElement("div", { key: i, style: { fontSize: 13, color: "rgba(255,255,255,0.7)", padding: "3px 0" } }, "\u2022 ", item)), party.menu.dietary && React.createElement("div", { style: { marginTop: 8, fontSize: 12, color: "rgba(255,255,255,0.5)", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 8 } }, "\u2139\uFE0F ", party.menu.dietary)), React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 } }, ["Vegetarian \u{1F955}", "Vegan \u{1F331}", "Gluten-free \u{1F33E}", "Dairy-free \u{1F95B}", "Nut allergy \u{1F95C}", "Halal \u2705", "Kosher \u2721\uFE0F", "No restrictions \u{1F60A}"].map((d) => React.createElement("div", { key: d, onClick: () => setDietary((prev) => prev === d ? "" : d), style: { padding: "7px 14px", borderRadius: 20, border: `2px solid ${dietary === d ? "#34d399" : "rgba(255,255,255,0.15)"}`, background: dietary === d ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.05)", cursor: "pointer", fontSize: 13, fontWeight: 500, transition: "all 0.2s" } }, d))), React.createElement(TextArea, { placeholder: "Or describe your requirements in detail...", value: ["Vegetarian \u{1F955}", "Vegan \u{1F331}", "Gluten-free \u{1F33E}", "Dairy-free \u{1F95B}", "Nut allergy \u{1F95C}", "Halal \u2705", "Kosher \u2721\uFE0F", "No restrictions \u{1F60A}"].includes(dietary) ? "" : dietary, onChange: (e) => setDietary(e.target.value) }));
       case "drinks":
-        return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 46, marginBottom: 10 } }, "\u{1F379}"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 900, marginBottom: 4 } }, "Drink Preference"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)" } }, "What would you like? Helps ", host.firstName, " stock up")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, [...party.drinkOptions, "\u{1F4A7} No preference"].map((d) => /* @__PURE__ */ React.createElement("div", { key: d, onClick: () => setDrinkPref(d === "\u{1F4A7} No preference" ? "" : d), style: { padding: "14px 16px", borderRadius: 12, border: `2px solid ${drinkPref === d || d === "\u{1F4A7} No preference" && drinkPref === "" ? "#c026d3" : "rgba(255,255,255,0.12)"}`, background: drinkPref === d || d === "\u{1F4A7} No preference" && drinkPref === "" ? "rgba(192,38,211,0.15)" : "rgba(255,255,255,0.04)", cursor: "pointer", fontSize: 15, fontWeight: 600, display: "flex", justifyContent: "space-between", alignItems: "center", transition: "all 0.2s" } }, d, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 14, color: "#c026d3", opacity: drinkPref === d || d === "\u{1F4A7} No preference" && drinkPref === "" ? 1 : 0 } }, "\u2713")))));
+        return React.createElement("div", null, React.createElement("div", { style: { textAlign: "center", marginBottom: 20 } }, React.createElement("div", { style: { fontSize: 46, marginBottom: 10 } }, "\u{1F379}"), React.createElement("div", { style: { fontSize: 22, fontWeight: 900, marginBottom: 4 } }, "Drink Preference"), React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)" } }, "What would you like? Helps ", host.firstName, " stock up")), React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, [...party.drinkOptions, "\u{1F4A7} No preference"].map((d) => React.createElement("div", { key: d, onClick: () => setDrinkPref(d === "\u{1F4A7} No preference" ? "" : d), style: { padding: "14px 16px", borderRadius: 12, border: `2px solid ${drinkPref === d || d === "\u{1F4A7} No preference" && drinkPref === "" ? "#c026d3" : "rgba(255,255,255,0.12)"}`, background: drinkPref === d || d === "\u{1F4A7} No preference" && drinkPref === "" ? "rgba(192,38,211,0.15)" : "rgba(255,255,255,0.04)", cursor: "pointer", fontSize: 15, fontWeight: 600, display: "flex", justifyContent: "space-between", alignItems: "center", transition: "all 0.2s" } }, d, React.createElement("span", { style: { fontSize: 14, color: "#c026d3", opacity: drinkPref === d || d === "\u{1F4A7} No preference" && drinkPref === "" ? 1 : 0 } }, "\u2713")))));
       case "questions":
-        return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 46, marginBottom: 10 } }, "\u2753"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 900, marginBottom: 4 } }, "Quick Questions"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)" } }, "From ", host.firstName)), party.customQuestions.map((q) => /* @__PURE__ */ React.createElement("div", { key: q.id, style: { marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, fontWeight: 600, marginBottom: 8, color: "#e879f9" } }, "\u2753 ", q.text), /* @__PURE__ */ React.createElement(TextArea, { placeholder: "Your answer (optional)...", value: answers[q.id] || "", onChange: (e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value })), style: { marginBottom: 0 } }))));
+        return React.createElement("div", null, React.createElement("div", { style: { textAlign: "center", marginBottom: 20 } }, React.createElement("div", { style: { fontSize: 46, marginBottom: 10 } }, "\u2753"), React.createElement("div", { style: { fontSize: 22, fontWeight: 900, marginBottom: 4 } }, "Quick Questions"), React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)" } }, "From ", host.firstName)), party.customQuestions.map((q) => React.createElement("div", { key: q.id, style: { marginBottom: 16 } }, React.createElement("div", { style: { fontSize: 15, fontWeight: 600, marginBottom: 8, color: "#e879f9" } }, "\u2753 ", q.text), React.createElement(TextArea, { placeholder: "Your answer (optional)...", value: answers[q.id] || "", onChange: (e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value })), style: { marginBottom: 0 } }))));
       case "ask_host":
-        return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginBottom: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 46, marginBottom: 10 } }, "\u{1F4AC}"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 22, fontWeight: 900, marginBottom: 4 } }, "Anything to ask?"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)" } }, "Send ", host.firstName, " a message (optional)")), /* @__PURE__ */ React.createElement(TextArea, { placeholder: `e.g. What should I bring? Is there parking? Can't wait!`, value: hostQuestion, onChange: (e) => setHostQuestion(e.target.value) }));
+        return React.createElement("div", null, React.createElement("div", { style: { textAlign: "center", marginBottom: 20 } }, React.createElement("div", { style: { fontSize: 46, marginBottom: 10 } }, "\u{1F4AC}"), React.createElement("div", { style: { fontSize: 22, fontWeight: 900, marginBottom: 4 } }, "Anything to ask?"), React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)" } }, "Send ", host.firstName, " a message (optional)")), React.createElement(TextArea, { placeholder: "e.g. What should I bring? Is there parking? Can't wait!", value: hostQuestion, onChange: (e) => setHostQuestion(e.target.value) }));
       case "done":
-        return /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: "40px 0" } }, rsvp === "accepted" ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 76, marginBottom: 16, animation: "float 2s ease-in-out infinite" } }, "\u{1F38A}"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 26, fontWeight: 900, marginBottom: 8 } }, "You're going!"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 15, color: "#34d399", fontWeight: 600, marginBottom: 6 } }, "\u2705 RSVP sent to ", host.firstName), plusOne === "yes" && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 6 } }, "\u{1F46B} Plus one request sent \u2014 awaiting approval"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 28 } }, "See you at ", party.title, "! \u{1F389}")) : rsvp === "declined" ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 76, marginBottom: 16 } }, "\u{1F614}"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 26, fontWeight: 900, marginBottom: 8 } }, "Sorry you can't make it"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)", marginBottom: 28 } }, host.firstName, " has been notified", cancelReason ? ` \u2014 "${cancelReason}"` : "")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 76, marginBottom: 16 } }, "\u{1F914}"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 26, fontWeight: 900, marginBottom: 8 } }, "Maybe noted!"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)", marginBottom: 28 } }, host.firstName, " will keep a spot open for you")), /* @__PURE__ */ React.createElement("button", { className: "btn-primary", style: { width: 200, margin: "0 auto" }, onClick: () => navigate("home") }, "Back to Home \u{1F3E0}"));
+        return React.createElement("div", { style: { textAlign: "center", padding: "40px 0" } },
+          // Animated RSVP celebration
+          showRsvpCelebration && React.createElement(React.Fragment, null,
+            React.createElement(EventParticles, { eventType: party.eventType, onDone: () => {} }),
+            React.createElement(FireworksCanvas, { colors: fireworksColors, duration: 3e3, onDone: () => setShowRsvpCelebration(false) })
+          ),
+          rsvp === "accepted" ? React.createElement(React.Fragment, null,
+            React.createElement("div", { style: { fontSize: 76, marginBottom: 16, animation: "float 2s ease-in-out infinite" } }, "\u{1F38A}"),
+            React.createElement("div", { style: { fontSize: 26, fontWeight: 900, marginBottom: 8, fontFamily: themeFont } }, "You're going!"),
+            React.createElement("div", { style: { fontSize: 15, color: "#34d399", fontWeight: 600, marginBottom: 6 } }, "\u2705 RSVP sent to ", host.firstName),
+            plusOne === "yes" && React.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 6 } }, "\u{1F46B} Plus one request sent \u2014 awaiting approval"),
+            // Countdown after RSVP
+            (party.confirmedDate || (party.dates && party.dates.length > 0)) && React.createElement("div", { style: { marginBottom: 16, marginTop: 8 } },
+              React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 6 } }, "Counting down..."),
+              React.createElement(Countdown, { dateStr: party.confirmedDate?.date || party.dates?.[0]?.date, timeStr: party.confirmedDate?.time || party.dates?.[0]?.time })
+            ),
+            React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 28 } }, "See you at ", party.title, "! \u{1F389}")
+          ) : rsvp === "declined" ? React.createElement(React.Fragment, null,
+            React.createElement("div", { style: { fontSize: 76, marginBottom: 16 } }, "\u{1F614}"),
+            React.createElement("div", { style: { fontSize: 26, fontWeight: 900, marginBottom: 8 } }, "Sorry you can't make it"),
+            React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)", marginBottom: 28 } }, host.firstName, " has been notified", cancelReason ? " \u2014 \"" + cancelReason + "\"" : "")
+          ) : React.createElement(React.Fragment, null,
+            React.createElement("div", { style: { fontSize: 76, marginBottom: 16 } }, "\u{1F914}"),
+            React.createElement("div", { style: { fontSize: 26, fontWeight: 900, marginBottom: 8 } }, "Maybe noted!"),
+            React.createElement("div", { style: { fontSize: 14, color: "rgba(255,255,255,0.5)", marginBottom: 28 } }, host.firstName, " will keep a spot open for you")
+          ),
+          React.createElement("button", { className: "btn-primary", style: { width: 200, margin: "0 auto" }, onClick: () => navigate("home") }, "Back to Home \u{1F3E0}")
+        );
       default:
         return null;
     }
   };
-  return /* @__PURE__ */ React.createElement("div", { className: "screen", style: { background: "linear-gradient(180deg,#0d0019 0%,#1a003a 100%)" } }, step > 0 && currentStep !== "done" && /* @__PURE__ */ React.createElement("div", { style: { padding: "50px 20px 14px", background: "rgba(13,0,25,0.92)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.08)", position: "sticky", top: 0, zIndex: 50 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 10 } }, step > 1 && /* @__PURE__ */ React.createElement("button", { onClick: goBack, style: { background: "rgba(255,255,255,0.08)", border: "none", color: "#fff", borderRadius: 10, width: 36, height: 36, fontSize: 18, cursor: "pointer", flexShrink: 0 } }, "\u2190"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 800, fontSize: 16 } }, party.title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)" } }, "by ", host.firstName, " ", host.lastName))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 3 } }, steps.filter((s) => s !== "fireworks" && s !== "done").map((_, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { flex: 1, height: 3, borderRadius: 2, background: i < step - 1 ? "linear-gradient(90deg,#c026d3,#7c3aed)" : "rgba(255,255,255,0.1)", transition: "background 0.3s" } })))), /* @__PURE__ */ React.createElement("div", { style: { padding: currentStep === "fireworks" ? 0 : "20px 20px 110px" }, key: currentStep }, /* @__PURE__ */ React.createElement("div", { style: { animation: "fadeIn 0.3s ease" } }, renderStep())), step > 0 && !isLast && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, padding: "12px 20px 20px", background: "rgba(13,0,25,0.95)", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", gap: 10 } }, isSecondLast ? /* @__PURE__ */ React.createElement("button", { className: "btn-primary", style: { flex: 1, background: "linear-gradient(135deg,#16a34a,#15803d)" }, onClick: goNext }, "Submit RSVP \u2705") : /* @__PURE__ */ React.createElement("button", { className: "btn-primary", style: { flex: 1, opacity: currentStep === "rsvp" && !rsvp ? 0.4 : 1 }, onClick: () => {
-    if (currentStep === "rsvp" && !rsvp) return;
-    goNext();
-  } }, currentStep === "rsvp" && !rsvp ? "Select an option to continue" : "Next \u2192")));
+  return React.createElement("div", { className: "screen", style: { background: getThemedBackground() } },
+    step > 0 && currentStep !== "done" && React.createElement("div", { style: { padding: "50px 20px 14px", background: "rgba(13,0,25,0.92)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.08)", position: "sticky", top: 0, zIndex: 50 } },
+      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 10 } },
+        step > 1 && React.createElement("button", { onClick: goBack, style: { background: "rgba(255,255,255,0.08)", border: "none", color: "#fff", borderRadius: 10, width: 36, height: 36, fontSize: 18, cursor: "pointer", flexShrink: 0 } }, "\u2190"),
+        React.createElement("div", { style: { flex: 1 } },
+          React.createElement("div", { style: { fontWeight: 800, fontSize: 16 } }, party.title),
+          React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)" } }, "by ", host.firstName, " ", host.lastName)
+        )
+      ),
+      React.createElement("div", { style: { display: "flex", gap: 3 } },
+        steps.filter((s) => s !== "fireworks" && s !== "done").map((_, i) => React.createElement("div", { key: i, style: { flex: 1, height: 3, borderRadius: 2, background: i < step - 1 ? "linear-gradient(90deg,#c026d3,#7c3aed)" : "rgba(255,255,255,0.1)", transition: "background 0.3s" } }))
+      )
+    ),
+    React.createElement("div", { style: { padding: currentStep === "fireworks" ? 0 : "20px 20px 110px" }, key: currentStep },
+      React.createElement("div", { style: { animation: "fadeIn 0.3s ease" } }, renderStep())
+    ),
+    step > 0 && !isLast && React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, padding: "12px 20px 20px", background: "rgba(13,0,25,0.95)", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", gap: 10 } },
+      isSecondLast ? React.createElement("button", { className: "btn-primary", style: { flex: 1, background: "linear-gradient(135deg,#16a34a,#15803d)" }, onClick: goNext }, "Submit RSVP \u2705") :
+      React.createElement("button", { className: "btn-primary", style: { flex: 1, opacity: currentStep === "rsvp" && !rsvp ? 0.4 : 1 }, onClick: () => {
+        if (currentStep === "rsvp" && !rsvp) return;
+        goNext();
+      } }, currentStep === "rsvp" && !rsvp ? "Select an option to continue" : "Next \u2192")
+    )
+  );
 };
 const PartyManageScreen = () => {
   const { screenData, navigate, currentUser, getParty, getUser, updateParty, deleteParty, inviteToParty, addPhoto, removePhoto, users, parties, sendPop, getPartyPops, getPartyShareLink } = useApp();
@@ -1512,7 +1827,7 @@ const PartyManageScreen = () => {
     }
     showToast("Invite link copied! \u{1F517}");
   };
-  const tabs = [{ id: "overview", label: "\u{1F4CB} Overview" }, { id: "guests", label: "\u{1F465} Guests" }, { id: "responses", label: "\u{1F4CA} Data" }, { id: "photos", label: "\u{1F4F8} Photos" }, { id: "invite", label: "\u2795 Invite" }, { id: "pop", label: "\u{1F4E2} Pop" }];
+  const tabs = [{ id: "overview", label: "\u{1F4CB} Overview" }, { id: "guests", label: "\u{1F465} Guests" }, { id: "responses", label: "\u{1F4CA} Data" }, { id: "analytics", label: "\u{1F4C8} Analytics" }, { id: "photos", label: "\u{1F4F8} Photos" }, { id: "invite", label: "\u2795 Invite" }, { id: "pop", label: "\u{1F4E2} Pop" }];
   return /* @__PURE__ */ React.createElement("div", { className: "screen", style: { background: "linear-gradient(180deg,#0d0019 0%,#1a003a 100%)", paddingBottom: 80 } }, toast && /* @__PURE__ */ React.createElement(Toast, { msg: toast.msg, type: toast.type }), /* @__PURE__ */ React.createElement("div", { style: { padding: "50px 20px 0", background: "rgba(13,0,25,0.9)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.08)", position: "sticky", top: 0, zIndex: 50 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => navigate("home"), style: { background: "rgba(255,255,255,0.08)", border: "none", color: "#fff", borderRadius: 10, width: 36, height: 36, fontSize: 18, cursor: "pointer" } }, "\u2190"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 800, fontSize: 17 } }, party.title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)" } }, "\u{1F4C5} ", dateStr, " \xB7 ", accepted.length, " going"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 2, overflowX: "auto", paddingBottom: 0 } }, tabs.map((t) => /* @__PURE__ */ React.createElement("button", { key: t.id, onClick: () => setTab(t.id), style: { background: "none", color: tab === t.id ? "#e879f9" : "rgba(255,255,255,0.5)", border: "none", borderBottom: `2px solid ${tab === t.id ? "#c026d3" : "transparent"}`, padding: "10px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s" } }, t.label)))), /* @__PURE__ */ React.createElement("div", { style: { padding: "16px 16px 20px" } }, tab === "overview" && /* @__PURE__ */ React.createElement("div", { style: { animation: "fadeIn 0.3s ease" } }, (party.confirmedDate || party.dates?.length > 0) && /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginBottom: 12, background: "rgba(192,38,211,0.1)", border: "1px solid rgba(192,38,211,0.3)" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 8 } }, "COUNTDOWN"), /* @__PURE__ */ React.createElement(Countdown, { dateStr: party.confirmedDate?.date || party.dates?.[0]?.date, timeStr: party.confirmedDate?.time || party.dates?.[0]?.time })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 } }, [{ n: accepted.length, label: "Accepted", color: "#34d399" }, { n: pending.length, label: "Pending", color: "#fbbf24" }, { n: declined.length, label: "Declined", color: "#f87171" }].map((s) => /* @__PURE__ */ React.createElement("div", { key: s.label, className: "card", style: { textAlign: "center", padding: "12px 8px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 800, color: s.color } }, s.n), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 } }, s.label)))), /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 15, marginBottom: 12 } }, "Party Details"), [
     { icon: "\u{1F4DD}", label: "Description", val: party.description || "No description" },
     { icon: "\u{1F4CD}", label: "Venue", val: party.location?.address || "Not set" },
@@ -1539,7 +1854,63 @@ const PartyManageScreen = () => {
     const max = Math.max(...Object.values(dateCounts), 1);
     const pct = Math.round(votes / invites.length * 100) || 0;
     return /* @__PURE__ */ React.createElement("div", { key: d.id, style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 } }, /* @__PURE__ */ React.createElement("span", null, fmtDate(d.date), " ", d.time && `at ${d.time}`), /* @__PURE__ */ React.createElement("span", { style: { color: "#e879f9", fontWeight: 700 } }, votes, " votes (", pct, "%)")), /* @__PURE__ */ React.createElement("div", { style: { height: 8, background: "rgba(255,255,255,0.1)", borderRadius: 4, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { height: "100%", width: `${votes / Math.max(invites.length, 1) * 100}%`, background: "linear-gradient(90deg,#c026d3,#7c3aed)", borderRadius: 4, transition: "width 0.5s ease" } })));
-  })), drinkList.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, marginBottom: 12 } }, "\u{1F379} Drink Preferences"), drinkList.map(([drink, count]) => /* @__PURE__ */ React.createElement("div", { key: drink, style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 } }, /* @__PURE__ */ React.createElement("span", null, drink), /* @__PURE__ */ React.createElement("span", { style: { color: "#e879f9", fontWeight: 700 } }, count, " people")), /* @__PURE__ */ React.createElement("div", { style: { height: 8, background: "rgba(255,255,255,0.1)", borderRadius: 4, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { height: "100%", width: `${count / Math.max(accepted.length, 1) * 100}%`, background: "linear-gradient(90deg,#fbbf24,#f87171)", borderRadius: 4 } }))))), dietaryList.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, marginBottom: 10 } }, "\u{1F957} Dietary Requirements"), dietaryList.map((d, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.07)", fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600, color: "#e879f9" } }, d.name, ":"), " ", d.dietary))), Object.values(questionAnswers).map((qa, i) => qa.answers.length > 0 && /* @__PURE__ */ React.createElement("div", { key: i, className: "card", style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, marginBottom: 10 } }, "\u2753 ", qa.question), qa.answers.map((a, j) => /* @__PURE__ */ React.createElement("div", { key: j, style: { padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.07)", fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600, color: "#e879f9" } }, a.name, ":"), " ", a.answer)))), accepted.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "rgba(255,255,255,0.3)", padding: 40, fontSize: 14 } }, "No responses yet")), tab === "photos" && /* @__PURE__ */ React.createElement("div", { style: { animation: "fadeIn 0.3s ease" } }, /* @__PURE__ */ React.createElement("input", { ref: photoRef, type: "file", accept: "image/*", multiple: true, style: { display: "none" }, onChange: handleAddPhoto }), /* @__PURE__ */ React.createElement("button", { className: "btn-primary", style: { marginBottom: 16 }, onClick: () => photoRef.current?.click() }, "\u{1F4F7} Add Photos"), party.photos?.length > 0 ? /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 } }, party.photos.map((ph) => /* @__PURE__ */ React.createElement("div", { key: ph.id, style: { position: "relative", paddingTop: "100%", borderRadius: 10, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("img", { src: ph.dataUrl, style: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }, alt: "" }), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent,rgba(0,0,0,0.8))", padding: "16px 6px 4px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "rgba(255,255,255,0.8)" } }, ph.userName)), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+  })), drinkList.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, marginBottom: 12 } }, "\u{1F379} Drink Preferences"), drinkList.map(([drink, count]) => /* @__PURE__ */ React.createElement("div", { key: drink, style: { marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 } }, /* @__PURE__ */ React.createElement("span", null, drink), /* @__PURE__ */ React.createElement("span", { style: { color: "#e879f9", fontWeight: 700 } }, count, " people")), /* @__PURE__ */ React.createElement("div", { style: { height: 8, background: "rgba(255,255,255,0.1)", borderRadius: 4, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { height: "100%", width: `${count / Math.max(accepted.length, 1) * 100}%`, background: "linear-gradient(90deg,#fbbf24,#f87171)", borderRadius: 4 } }))))), dietaryList.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, marginBottom: 10 } }, "\u{1F957} Dietary Requirements"), dietaryList.map((d, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.07)", fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600, color: "#e879f9" } }, d.name, ":"), " ", d.dietary))), Object.values(questionAnswers).map((qa, i) => qa.answers.length > 0 && /* @__PURE__ */ React.createElement("div", { key: i, className: "card", style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, marginBottom: 10 } }, "\u2753 ", qa.question), qa.answers.map((a, j) => /* @__PURE__ */ React.createElement("div", { key: j, style: { padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.07)", fontSize: 13 } }, /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600, color: "#e879f9" } }, a.name, ":"), " ", a.answer)))), accepted.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "rgba(255,255,255,0.3)", padding: 40, fontSize: 14 } }, "No responses yet")),
+    // Analytics tab
+    tab === "analytics" && React.createElement("div", { style: { animation: "fadeIn 0.3s ease" } },
+      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 } },
+        [
+          { n: party.inviteViews || 0, label: "Invite Views", color: "#60a5fa", icon: "\u{1F441}\uFE0F" },
+          { n: invites.length, label: "Invites Sent", color: "#e879f9", icon: "\u{1F4E8}" },
+          { n: accepted.length, label: "RSVPs", color: "#34d399", icon: "\u2705" },
+          { n: invites.length > 0 ? Math.round(accepted.length / invites.length * 100) : 0, label: "RSVP Rate %", color: "#fbbf24", icon: "\u{1F4CA}" }
+        ].map((s) => React.createElement("div", { key: s.label, className: "card", style: { textAlign: "center", padding: "14px 8px" } },
+          React.createElement("div", { style: { fontSize: 16, marginBottom: 4 } }, s.icon),
+          React.createElement("div", { style: { fontSize: 28, fontWeight: 800, color: s.color } }, s.n),
+          React.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 } }, s.label)
+        ))
+      ),
+      // Conversion funnel
+      React.createElement("div", { className: "card", style: { marginBottom: 14 } },
+        React.createElement("div", { style: { fontWeight: 700, marginBottom: 12 } }, "\u{1F4CA} Invite Funnel"),
+        [
+          { label: "Viewed invite", val: party.inviteViews || 0, color: "#60a5fa" },
+          { label: "Responded", val: invites.filter(i => i.status !== "pending").length, color: "#e879f9" },
+          { label: "Accepted", val: accepted.length, color: "#34d399" }
+        ].map((item, i) => {
+          const maxVal = Math.max(party.inviteViews || 1, invites.length, 1);
+          return React.createElement("div", { key: item.label, style: { marginBottom: 10 } },
+            React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 } },
+              React.createElement("span", null, item.label),
+              React.createElement("span", { style: { color: item.color, fontWeight: 700 } }, item.val)
+            ),
+            React.createElement("div", { style: { height: 8, background: "rgba(255,255,255,0.1)", borderRadius: 4, overflow: "hidden" } },
+              React.createElement("div", { style: { height: "100%", width: (item.val / maxVal * 100) + "%", background: item.color, borderRadius: 4, transition: "width 0.5s ease" } })
+            )
+          );
+        })
+      ),
+      // Smart sections summary
+      party.smartSections && Object.keys(party.smartSections).some(k => party.smartSections[k]) && React.createElement("div", { className: "card", style: { marginBottom: 14 } },
+        React.createElement("div", { style: { fontWeight: 700, marginBottom: 10 } }, "\u{1F4A1} Active Smart Sections"),
+        Object.entries(party.smartSections).filter(([k,v]) => v).map(([key]) => {
+          const sec = SMART_SECTION_LABELS[key];
+          return sec ? React.createElement("div", { key, style: { fontSize: 13, color: "rgba(255,255,255,0.7)", padding: "4px 0" } }, sec.emoji, " ", sec.label) : null;
+        })
+      ),
+      // Playlist & mood board status
+      React.createElement("div", { className: "card" },
+        React.createElement("div", { style: { fontWeight: 700, marginBottom: 10 } }, "\u{1F3A8} Invite Card Features"),
+        [
+          { label: "Cover Image", active: !!party.coverImage },
+          { label: "Playlist", active: !!party.playlistUrl },
+          { label: "Mood Board", active: party.moodBoard && party.moodBoard.length > 0 },
+          { label: "Smart Sections", active: party.smartSections && Object.keys(party.smartSections).some(k => party.smartSections[k]) }
+        ].map(f => React.createElement("div", { key: f.label, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" } },
+          React.createElement("span", { style: { fontSize: 13, color: "rgba(255,255,255,0.7)" } }, f.label),
+          React.createElement("span", { style: { fontSize: 12, color: f.active ? "#34d399" : "rgba(255,255,255,0.3)", fontWeight: 600 } }, f.active ? "\u2705 Active" : "\u2014 Not set")
+        ))
+      )
+    ), tab === "photos" && /* @__PURE__ */ React.createElement("div", { style: { animation: "fadeIn 0.3s ease" } }, /* @__PURE__ */ React.createElement("input", { ref: photoRef, type: "file", accept: "image/*", multiple: true, style: { display: "none" }, onChange: handleAddPhoto }), /* @__PURE__ */ React.createElement("button", { className: "btn-primary", style: { marginBottom: 16 }, onClick: () => photoRef.current?.click() }, "\u{1F4F7} Add Photos"), party.photos?.length > 0 ? /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 } }, party.photos.map((ph) => /* @__PURE__ */ React.createElement("div", { key: ph.id, style: { position: "relative", paddingTop: "100%", borderRadius: 10, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("img", { src: ph.dataUrl, style: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }, alt: "" }), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent,rgba(0,0,0,0.8))", padding: "16px 6px 4px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "rgba(255,255,255,0.8)" } }, ph.userName)), /* @__PURE__ */ React.createElement("button", { onClick: () => {
     if (window.confirm("Remove this photo?")) removePhoto(party.id, ph.id);
   }, style: { position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", color: "#f87171", border: "none", borderRadius: "50%", width: 24, height: 24, fontSize: 12, cursor: "pointer" } }, "\u2715")))) : /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "rgba(255,255,255,0.3)", padding: 40, fontSize: 14 } }, "No photos yet \u{1F4F8}")), tab === "invite" && /* @__PURE__ */ React.createElement("div", { style: { animation: "fadeIn 0.3s ease" } }, /* @__PURE__ */ React.createElement("input", { className: "input-field", style: { marginBottom: 12 }, placeholder: "\u{1F50D} Search by name or email...", value: searchQ, onChange: (e) => setSearchQ(e.target.value) }), filteredUsers.map((u) => /* @__PURE__ */ React.createElement("div", { key: u.id, style: { display: "flex", alignItems: "center", gap: 12, padding: "10px", background: "rgba(255,255,255,0.05)", borderRadius: 12, marginBottom: 6 } }, /* @__PURE__ */ React.createElement(Avatar, { user: u, size: 38 }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 600, fontSize: 14 } }, u.firstName, " ", u.lastName), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)" } }, u.email)), /* @__PURE__ */ React.createElement("button", { onClick: () => {
     inviteToParty(party.id, u.id);
@@ -1595,7 +1966,7 @@ const FriendsScreen = () => {
   const myId = currentUser?.id || "";
   const myFriends = currentUser?.friends || [];
   const myRequests = currentUser?.friendRequests || [];
-  const myQRValue = buildWebLink(`add-friend?id=${myId}&name=${encodeURIComponent((currentUser?.firstName||'')+ ' '+(currentUser?.lastName||''))}`);
+  const myQRValue = buildWebLink(`add-friend?id=${myId}&name=${encodeURIComponent((currentUser?.firstName||'')+' '+(currentUser?.lastName||''))}`);
   const allOtherUsers = users.filter(
     (u) => u.id !== myId && !myFriends.includes(u.id) && !myRequests.some((r) => r && r.from === u.id)
   );
@@ -1825,7 +2196,7 @@ const App = () => {
     if (!hash) return;
     const hashPart = hash.substring(1); // remove #
     
-    if (!currentUser) return; // wait until logged in
+    if (!currentUser) return;
 
     if (hashPart.startsWith('add-friend')) {
       const params = new URLSearchParams(hashPart.split('?')[1]);
