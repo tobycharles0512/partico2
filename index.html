@@ -2268,8 +2268,18 @@ const App = () => {
   return /* @__PURE__ */ React.createElement(HomeScreen, null);
 };
 const rootEl = document.getElementById("root");
-const root = ReactDOM.createRoot(rootEl);
-root.render(/* @__PURE__ */ React.createElement(ErrorBoundary, null, /* @__PURE__ */ React.createElement(AppProvider, null, /* @__PURE__ */ React.createElement(App, null))));
+try {
+  const root = ReactDOM.createRoot(rootEl);
+  root.render(/* @__PURE__ */ React.createElement(ErrorBoundary, null, /* @__PURE__ */ React.createElement(AppProvider, null, /* @__PURE__ */ React.createElement(App, null))));
+} catch(e) {
+  rootEl.innerHTML = '<div style="color:red;padding:20px;font-size:14px;word-break:break-all">BOOT ERROR: ' + e.message + '<br><br>' + e.stack + '</div>';
+}
+window.onerror = function(msg, url, line, col, err) {
+  var r = document.getElementById("root");
+  if (r && r.children.length === 0) {
+    r.innerHTML = '<div style="color:red;padding:20px;font-size:14px;word-break:break-all">JS ERROR: ' + msg + ' at line ' + line + ':' + col + '</div>';
+  }
+};
 
 </script>
 </body>
