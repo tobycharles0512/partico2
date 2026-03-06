@@ -422,7 +422,7 @@ const AppProvider = ({ children }) => {
     const party = parties.find((p) => p.id === partyId);
     if (!party) return '';
     const host = users.find((u) => u.id === party.hostId);
-    const date = party.confirmedDate?.date || (party.dates[0]?.date || '');
+    const date = party.confirmedDate?.date || (party.dates?.[0]?.date || '');
     const location = party.location?.address || '';
     const eventType = party.eventType || 'party';
     const link = window.location.origin + window.location.pathname +
