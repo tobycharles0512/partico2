@@ -95,10 +95,7 @@ setTimeout(function(){
 if(typeof React==='undefined'||typeof ReactDOM==='undefined'){var _m=document.getElementById('pre-loader-msg');if(_m)_m.textContent='Could not load app — check your internet and refresh';throw new Error('React CDN failed to load');}
 const { useState, useEffect, useRef, useContext, createContext, useCallback, useMemo } = React;
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
-const getBaseUrl = () => {
-  const p = window.location.origin + window.location.pathname;
-  return p.endsWith('index.html') ? p.slice(0, p.lastIndexOf('/') + 1) : (p.endsWith('/') ? p : p + '/');
-};
+const getBaseUrl = () => { const p = window.location.origin + window.location.pathname; return p.endsWith('index.html') ? p.slice(0, p.lastIndexOf('/') + 1) : (p.endsWith('/') ? p : p + '/'); };
 const buildWebLink = (hash) => getBaseUrl() + '#' + hash;
 const ls = {
   get: (k, d = null) => {
@@ -265,7 +262,7 @@ const AppProvider = ({ children }) => {
   const createParty = (data) => {
     if (!currentUser) return null;
     const partyId = uid();
-    const inviteLink = buildWebLink(`join-party?partyId=${partyId}`);
+    const inviteLink = buildWebLink('join-party?partyId=' + partyId);
     const party = {
       id: partyId,
       hostId: currentUser.id,
@@ -422,7 +419,7 @@ const AppProvider = ({ children }) => {
     const party = parties.find((p) => p.id === partyId);
     if (!party) return '';
     const host = users.find((u) => u.id === party.hostId);
-    const date = party.confirmedDate?.date || (party.dates?.[0]?.date || '');
+    const date = party.confirmedDate?.date || (party.dates[0]?.date || '');
     const location = party.location?.address || '';
     const eventType = party.eventType || 'party';
     const link = window.location.origin + window.location.pathname +
@@ -788,21 +785,23 @@ const EventParticles = ({ eventType, onDone }) => {
 };
 const QRCode = ({ value, size = 180 }) => {
   const containerRef = useRef(null);
-  useEffect(() => {
+  useEffect(function() {
     if (!containerRef.current) return;
     containerRef.current.innerHTML = '';
     if (typeof window.QRCode !== 'undefined') {
       new window.QRCode(containerRef.current, { text: value, width: size, height: size, colorDark: "#1a0030", colorLight: "#ffffff", correctLevel: window.QRCode.CorrectLevel.M });
     } else {
-      containerRef.current.innerHTML = '<div style="width:'+size+'px;height:'+size+'px;display:flex;align-items:center;justify-content:center;background:white;border-radius:12px;color:#666;font-size:12px;text-align:center;padding:8px">QR loading...</div>';
-      const check = setInterval(() => {
+      containerRef.current.innerHTML = '<div style="width:' + size + 'px;height:' + size + 'px;display:flex;align-items:center;justify-content:center;background:white;border-radius:12px;color:#666;font-size:12px;text-align:center;padding:8px">QR loading...</div>';
+      var check = setInterval(function() {
         if (typeof window.QRCode !== 'undefined') {
           clearInterval(check);
-          containerRef.current.innerHTML = '';
-          new window.QRCode(containerRef.current, { text: value, width: size, height: size, colorDark: "#1a0030", colorLight: "#ffffff", correctLevel: window.QRCode.CorrectLevel.M });
+          if (containerRef.current) {
+            containerRef.current.innerHTML = '';
+            new window.QRCode(containerRef.current, { text: value, width: size, height: size, colorDark: "#1a0030", colorLight: "#ffffff", correctLevel: window.QRCode.CorrectLevel.M });
+          }
         }
       }, 200);
-      setTimeout(() => clearInterval(check), 5000);
+      setTimeout(function() { clearInterval(check); }, 5000);
     }
   }, [value, size]);
   return /* @__PURE__ */ React.createElement("div", { ref: containerRef, style: { borderRadius: 12, overflow: "hidden", display: "inline-block" } });
@@ -1746,7 +1745,7 @@ const InvitationScreen = () => {
   );
 };
 const PartyManageScreen = () => {
-  const { screenData, navigate, currentUser, getParty, getUser, updateParty, deleteParty, inviteToParty, addPhoto, removePhoto, users, parties, sendPop, getPartyPops, getPartyShareLink } = useApp();
+  const { screenData, navigate, currentUser, getParty, getUser, updateParty, deleteParty, inviteToParty, addPhoto, removePhoto, users, parties, sendPop, getPartyPops } = useApp();
   const [tab, setTab] = useState("overview");
   const [toast, setToast] = useState(null);
   const [popMsg, setPopMsg] = useState("");
@@ -1825,7 +1824,7 @@ const PartyManageScreen = () => {
   const filteredUsers = searchQ ? allOtherUsers.filter((u) => `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(searchQ.toLowerCase())) : allOtherUsers.slice(0, 10);
   const copyInviteLink = () => {
     try {
-      navigator.clipboard.writeText(getPartyShareLink(party.id));
+      navigator.clipboard.writeText(party.inviteLink || buildWebLink('join-party?partyId=' + party.id));
     } catch {
     }
     showToast("Invite link copied! \u{1F517}");
@@ -1837,7 +1836,7 @@ const PartyManageScreen = () => {
     { icon: "\u{1F17F}\uFE0F", label: "Parking", val: party.location?.parkingAddress || "Not provided" },
     { icon: "\u{1F457}", label: "Dress Code", val: party.dressCode?.description || "Not specified" },
     { icon: "\u{1F512}", label: "Privacy", val: party.isPrivate ? "Private" : "Public" }
-  ].map((d) => /* @__PURE__ */ React.createElement("div", { key: d.label, style: { display: "flex", gap: 10, padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.07)" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, flexShrink: 0 } }, d.icon), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 1 } }, d.label), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.8)" } }, d.val))))), /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, marginBottom: 8 } }, "\u{1F517} Party Invite Link"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 8, wordBreak: "break-all" } }, getPartyShareLink(party.id)), /* @__PURE__ */ React.createElement("button", { className: "btn-secondary", style: { fontSize: 13 }, onClick: copyInviteLink }, "\u{1F4CB} Copy Link")), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+  ].map((d) => /* @__PURE__ */ React.createElement("div", { key: d.label, style: { display: "flex", gap: 10, padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.07)" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, flexShrink: 0 } }, d.icon), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 1 } }, d.label), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.8)" } }, d.val))))), /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, marginBottom: 8 } }, "\u{1F517} Party Invite Link"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 8, wordBreak: "break-all" } }, party.inviteLink || buildWebLink('join-party?partyId=' + party.id)), /* @__PURE__ */ React.createElement("button", { className: "btn-secondary", style: { fontSize: 13 }, onClick: copyInviteLink }, "\u{1F4CB} Copy Link")), /* @__PURE__ */ React.createElement("button", { onClick: () => {
     if (window.confirm("Delete this party? This cannot be undone.")) {
       deleteParty(party.id);
       navigate("home");
@@ -1969,7 +1968,7 @@ const FriendsScreen = () => {
   const myId = currentUser?.id || "";
   const myFriends = currentUser?.friends || [];
   const myRequests = currentUser?.friendRequests || [];
-  const myQRValue = buildWebLink(`add-friend?id=${myId}&name=${encodeURIComponent((currentUser?.firstName||'')+' '+(currentUser?.lastName||''))}`);
+  const myQRValue = buildWebLink('add-friend?id=' + myId + '&name=' + encodeURIComponent((currentUser?.firstName||'') + ' ' + (currentUser?.lastName||'')));
   const allOtherUsers = users.filter(
     (u) => u.id !== myId && !myFriends.includes(u.id) && !myRequests.some((r) => r && r.from === u.id)
   );
@@ -2055,7 +2054,7 @@ const ProfileScreen = () => {
   const hosted = getHostedParties();
   const myInvites = getMyInvites();
   const attended = myInvites.filter((p) => p.status === "past" || p.invites?.find((i) => i.userId === currentUser?.id && i.status === "accepted"));
-  const myQRValue = buildWebLink(`add-friend?id=${currentUser?.id || ''}&name=${encodeURIComponent((currentUser?.firstName||'')+' '+(currentUser?.lastName||''))}`);
+  const myQRValue = buildWebLink('add-friend?id=' + (currentUser?.id || '') + '&name=' + encodeURIComponent((currentUser?.firstName||'') + ' ' + (currentUser?.lastName||'')));
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -2200,7 +2199,6 @@ const App = () => {
     const hashPart = hash.substring(1); // remove #
     
     if (!currentUser) return;
-
     if (hashPart.startsWith('add-friend')) {
       const params = new URLSearchParams(hashPart.split('?')[1]);
       const userId = params.get('id');
@@ -2214,7 +2212,6 @@ const App = () => {
     } else if (hashPart.startsWith('join-party')) {
       const params = new URLSearchParams(hashPart.split('?')[1]);
       const partyId = params.get('partyId');
-
       if (partyId) {
         joinPartyFromInvite(partyId);
         navigate('partyDetail', { partyId });
@@ -2268,18 +2265,8 @@ const App = () => {
   return /* @__PURE__ */ React.createElement(HomeScreen, null);
 };
 const rootEl = document.getElementById("root");
-try {
-  const root = ReactDOM.createRoot(rootEl);
-  root.render(/* @__PURE__ */ React.createElement(ErrorBoundary, null, /* @__PURE__ */ React.createElement(AppProvider, null, /* @__PURE__ */ React.createElement(App, null))));
-} catch(e) {
-  rootEl.innerHTML = '<div style="color:red;padding:20px;font-size:14px;word-break:break-all">BOOT ERROR: ' + e.message + '<br><br>' + e.stack + '</div>';
-}
-window.onerror = function(msg, url, line, col, err) {
-  var r = document.getElementById("root");
-  if (r && r.children.length === 0) {
-    r.innerHTML = '<div style="color:red;padding:20px;font-size:14px;word-break:break-all">JS ERROR: ' + msg + ' at line ' + line + ':' + col + '</div>';
-  }
-};
+const root = ReactDOM.createRoot(rootEl);
+root.render(/* @__PURE__ */ React.createElement(ErrorBoundary, null, /* @__PURE__ */ React.createElement(AppProvider, null, /* @__PURE__ */ React.createElement(App, null))));
 
 </script>
 </body>
