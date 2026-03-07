@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Partico 🎉</title>
-<script>window.onerror=function(m,u,l,c,e){var d=document.getElementById('_dbg');if(!d){d=document.createElement('div');d.id='_dbg';d.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:red;color:white;padding:12px;font-size:13px;word-break:break-all;max-height:50vh;overflow:auto';document.body?document.body.appendChild(d):document.addEventListener('DOMContentLoaded',function(){document.body.appendChild(d)});}d.innerHTML+='<b>ERROR:</b> '+m+' <b>at line</b> '+l+':'+c+'<br>';return false;};</script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" onerror="document.write('\x3Cscript crossorigin src=\'https://unpkg.com/react@18.2.0/umd/react.production.min.js\'\x3E\x3C\/script\x3E')"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" onerror="document.write('\x3Cscript crossorigin src=\'https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js\'\x3E\x3C\/script\x3E')"></script>
 <!-- Babel removed: JSX pre-compiled -->
@@ -96,6 +95,8 @@ setTimeout(function(){
 if(typeof React==='undefined'||typeof ReactDOM==='undefined'){var _m=document.getElementById('pre-loader-msg');if(_m)_m.textContent='Could not load app — check your internet and refresh';throw new Error('React CDN failed to load');}
 const { useState, useEffect, useRef, useContext, createContext, useCallback, useMemo } = React;
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+const getBaseUrl = () => { const p = window.location.origin + window.location.pathname; return p.endsWith('index.html') ? p.slice(0, p.lastIndexOf('/') + 1) : (p.endsWith('/') ? p : p + '/'); };
+const buildWebLink = (hash) => getBaseUrl() + '#' + hash;
 const ls = {
   get: (k, d = null) => {
     try {
@@ -261,7 +262,7 @@ const AppProvider = ({ children }) => {
   const createParty = (data) => {
     if (!currentUser) return null;
     const partyId = uid();
-    const inviteLink = `partico://party/${partyId}`;
+    const inviteLink = buildWebLink('join-party?partyId=' + partyId);
     const party = {
       id: partyId,
       hostId: currentUser.id,
@@ -783,33 +784,27 @@ const EventParticles = ({ eventType, onDone }) => {
   return /* @__PURE__ */ React.createElement("canvas", { ref, style: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 998 } });
 };
 const QRCode = ({ value, size = 180 }) => {
-  const cells = 21;
-  const cellSize = Math.floor(size / cells);
-  const seed = value.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  const rand = (i, j) => {
-    const v = (seed * 31 + i * 17 + j * 13) % 100;
-    return v > 45;
-  };
-  const finder = (r, c) => {
-    const inCorner = (rr2, cc2) => rr2 >= 0 && rr2 < 7 && cc2 >= 0 && cc2 < 7 || rr2 >= 0 && rr2 < 7 && cc2 >= cells - 7 && cc2 < cells || rr2 >= cells - 7 && rr2 < cells && cc2 >= 0 && cc2 < 7;
-    if (!inCorner(r, c)) return null;
-    const rr = r < 7 ? r : r - (cells - 7), cc = c < 7 ? c : c < cells - 7 ? -1 : c - (cells - 7);
-    if (rr < 0 || cc < 0) return null;
-    if (rr === 0 || rr === 6 || cc === 0 || cc === 6) return true;
-    if (rr >= 2 && rr <= 4 && cc >= 2 && cc <= 4) return true;
-    return false;
-  };
-  const rows = [];
-  for (let r = 0; r < cells; r++) {
-    const cols = [];
-    for (let c = 0; c < cells; c++) {
-      const f = finder(r, c);
-      const dark = f !== null ? f : rand(r, c);
-      cols.push(/* @__PURE__ */ React.createElement("rect", { key: c, x: c * cellSize, y: r * cellSize, width: cellSize, height: cellSize, fill: dark ? "#1a0030" : "white" }));
+  const containerRef = useRef(null);
+  useEffect(function() {
+    if (!containerRef.current) return;
+    containerRef.current.innerHTML = '';
+    if (typeof window.QRCode !== 'undefined') {
+      new window.QRCode(containerRef.current, { text: value, width: size, height: size, colorDark: "#1a0030", colorLight: "#ffffff", correctLevel: window.QRCode.CorrectLevel.M });
+    } else {
+      containerRef.current.innerHTML = '<div style="width:' + size + 'px;height:' + size + 'px;display:flex;align-items:center;justify-content:center;background:white;border-radius:12px;color:#666;font-size:12px;text-align:center;padding:8px">QR loading...</div>';
+      var check = setInterval(function() {
+        if (typeof window.QRCode !== 'undefined') {
+          clearInterval(check);
+          if (containerRef.current) {
+            containerRef.current.innerHTML = '';
+            new window.QRCode(containerRef.current, { text: value, width: size, height: size, colorDark: "#1a0030", colorLight: "#ffffff", correctLevel: window.QRCode.CorrectLevel.M });
+          }
+        }
+      }, 200);
+      setTimeout(function() { clearInterval(check); }, 5000);
     }
-    rows.push(...cols);
-  }
-  return /* @__PURE__ */ React.createElement("svg", { width: size, height: size, style: { borderRadius: 12, background: "white", padding: 8 } }, rows);
+  }, [value, size]);
+  return /* @__PURE__ */ React.createElement("div", { ref: containerRef, style: { borderRadius: 12, overflow: "hidden", display: "inline-block" } });
 };
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -1829,7 +1824,7 @@ const PartyManageScreen = () => {
   const filteredUsers = searchQ ? allOtherUsers.filter((u) => `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(searchQ.toLowerCase())) : allOtherUsers.slice(0, 10);
   const copyInviteLink = () => {
     try {
-      navigator.clipboard.writeText(party.inviteLink || `partico://party/${party.id}`);
+      navigator.clipboard.writeText(party.inviteLink || buildWebLink('join-party?partyId=' + party.id));
     } catch {
     }
     showToast("Invite link copied! \u{1F517}");
@@ -1841,7 +1836,7 @@ const PartyManageScreen = () => {
     { icon: "\u{1F17F}\uFE0F", label: "Parking", val: party.location?.parkingAddress || "Not provided" },
     { icon: "\u{1F457}", label: "Dress Code", val: party.dressCode?.description || "Not specified" },
     { icon: "\u{1F512}", label: "Privacy", val: party.isPrivate ? "Private" : "Public" }
-  ].map((d) => /* @__PURE__ */ React.createElement("div", { key: d.label, style: { display: "flex", gap: 10, padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.07)" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, flexShrink: 0 } }, d.icon), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 1 } }, d.label), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.8)" } }, d.val))))), /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, marginBottom: 8 } }, "\u{1F517} Party Invite Link"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 8, wordBreak: "break-all" } }, "partico://party/", party.id), /* @__PURE__ */ React.createElement("button", { className: "btn-secondary", style: { fontSize: 13 }, onClick: copyInviteLink }, "\u{1F4CB} Copy Link")), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+  ].map((d) => /* @__PURE__ */ React.createElement("div", { key: d.label, style: { display: "flex", gap: 10, padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.07)" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 16, flexShrink: 0 } }, d.icon), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 1 } }, d.label), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.8)" } }, d.val))))), /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, marginBottom: 8 } }, "\u{1F517} Party Invite Link"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 8, wordBreak: "break-all" } }, party.inviteLink || buildWebLink('join-party?partyId=' + party.id)), /* @__PURE__ */ React.createElement("button", { className: "btn-secondary", style: { fontSize: 13 }, onClick: copyInviteLink }, "\u{1F4CB} Copy Link")), /* @__PURE__ */ React.createElement("button", { onClick: () => {
     if (window.confirm("Delete this party? This cannot be undone.")) {
       deleteParty(party.id);
       navigate("home");
@@ -1922,7 +1917,7 @@ const PartyManageScreen = () => {
   }, style: { position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", color: "#f87171", border: "none", borderRadius: "50%", width: 24, height: 24, fontSize: 12, cursor: "pointer" } }, "\u2715")))) : /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "rgba(255,255,255,0.3)", padding: 40, fontSize: 14 } }, "No photos yet \u{1F4F8}")), tab === "invite" && /* @__PURE__ */ React.createElement("div", { style: { animation: "fadeIn 0.3s ease" } }, /* @__PURE__ */ React.createElement("input", { className: "input-field", style: { marginBottom: 12 }, placeholder: "\u{1F50D} Search by name or email...", value: searchQ, onChange: (e) => setSearchQ(e.target.value) }), filteredUsers.map((u) => /* @__PURE__ */ React.createElement("div", { key: u.id, style: { display: "flex", alignItems: "center", gap: 12, padding: "10px", background: "rgba(255,255,255,0.05)", borderRadius: 12, marginBottom: 6 } }, /* @__PURE__ */ React.createElement(Avatar, { user: u, size: 38 }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 600, fontSize: 14 } }, u.firstName, " ", u.lastName), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)" } }, u.email)), /* @__PURE__ */ React.createElement("button", { onClick: () => {
     inviteToParty(party.id, u.id);
     showToast(`${u.firstName} invited! \u{1F389}`);
-  }, style: { background: "linear-gradient(135deg,#c026d3,#7c3aed)", color: "#fff", border: "none", borderRadius: 10, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" } }, "Invite"))), filteredUsers.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "rgba(255,255,255,0.3)", padding: 40, fontSize: 14 } }, "No more users to invite")), tab === "pop" && React.createElement("div", { style: { animation: "fadeIn 0.3s ease" } }, React.createElement("div", { className: "card", style: { marginBottom: 16, background: "rgba(192,38,211,0.08)", border: "1px solid rgba(192,38,211,0.35)" } }, React.createElement("div", { style: { fontSize: 16, fontWeight: 800, marginBottom: 4 } }, "\u{1F4E2} Partico Pop"), React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.45)", marginBottom: 14, lineHeight: 1.7 } }, "Send an instant update to all guests \u2014 they\u2019ll see it in their notifications and event page. Start your message with \u201CPartico:\u201D to make it official!"), React.createElement("textarea", { className: "input-field", style: { resize: "none", minHeight: 96, marginBottom: 10 }, placeholder: "e.g. Partico: Hey everyone \u2014 we\u2019re now starting at 8pm, bring a jacket!", value: popMsg, onChange: (e) => setPopMsg(e.target.value) }), React.createElement("button", { className: "btn-primary", onClick: () => { if (!popMsg.trim()) { showToast("Write a message first", "error"); return; } sendPop(party.id, popMsg); setPopMsg(""); showToast("\u{1F4E2} Partico Pop sent to all guests!"); } }, "\u{1F4E2} Send Partico Pop to All Guests")), React.createElement("div", { style: { fontWeight: 600, fontSize: 14, marginBottom: 10, color: "rgba(255,255,255,0.6)" } }, "\u{1F4CB} Pop History"), (getPartyPops(party.id) || []).length === 0 ? React.createElement("div", { style: { textAlign: "center", color: "rgba(255,255,255,0.3)", padding: 30, fontSize: 13, background: "rgba(255,255,255,0.03)", borderRadius: 14 } }, "\u{1F4E2} No pops sent yet \u2014 type a message above to update your guests") : [...(getPartyPops(party.id))].reverse().map((b) => React.createElement("div", { key: b.id, className: "card", style: { marginBottom: 8, background: "rgba(255,255,255,0.04)", borderLeft: "3px solid #c026d3" } }, React.createElement("div", { style: { fontSize: 11, color: "#c026d3", fontWeight: 700, marginBottom: 5 } }, "\u{1F4E2} Partico Pop \u00B7 " + new Date(b.timestamp).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })), React.createElement("div", { style: { fontSize: 14, color: "#fff", lineHeight: 1.6 } }, b.message)))), /* @__PURE__ */ React.createElement(BottomNav, { screen: "home", navigate }));
+  }, style: { background: "linear-gradient(135deg,#c026d3,#7c3aed)", color: "#fff", border: "none", borderRadius: 10, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" } }, "Invite"))), filteredUsers.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "rgba(255,255,255,0.3)", padding: 40, fontSize: 14 } }, "No more users to invite")), tab === "pop" && React.createElement("div", { style: { animation: "fadeIn 0.3s ease" } }, React.createElement("div", { className: "card", style: { marginBottom: 16, background: "rgba(192,38,211,0.08)", border: "1px solid rgba(192,38,211,0.35)" } }, React.createElement("div", { style: { fontSize: 16, fontWeight: 800, marginBottom: 4 } }, "\u{1F4E2} Partico Pop"), React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.45)", marginBottom: 14, lineHeight: 1.7 } }, "Send an instant update to all guests \u2014 they\u2019ll see it in their notifications and event page. Start your message with \u201CPartico:\u201D to make it official!"), React.createElement("textarea", { className: "input-field", style: { resize: "none", minHeight: 96, marginBottom: 10 }, placeholder: "e.g. Partico: Hey everyone \u2014 we\u2019re now starting at 8pm, bring a jacket!", value: popMsg, onChange: (e) => setPopMsg(e.target.value) }), React.createElement("button", { className: "btn-primary", onClick: () => { if (!popMsg.trim()) { showToast("Write a message first", "error"); return; } sendPop(party.id, popMsg); setPopMsg(""); showToast("\u{1F4E2} Partico Pop sent to all guests!"); } }, "\u{1F4E2} Send Partico Pop to All Guests")), React.createElement("div", { style: { fontWeight: 600, fontSize: 14, marginBottom: 10, color: "rgba(255,255,255,0.6)" } }, "\u{1F4CB} Pop History"), (getPartyPops(party.id) || []).length === 0 ? React.createElement("div", { style: { textAlign: "center", color: "rgba(255,255,255,0.3)", padding: 30, fontSize: 13, background: "rgba(255,255,255,0.03)", borderRadius: 14 } }, "\u{1F4E2} No pops sent yet \u2014 type a message above to update your guests") : [...(getPartyPops(party.id))].reverse().map((b) => React.createElement("div", { key: b.id, className: "card", style: { marginBottom: 8, background: "rgba(255,255,255,0.04)", borderLeft: "3px solid #c026d3" } }, React.createElement("div", { style: { fontSize: 11, color: "#c026d3", fontWeight: 700, marginBottom: 5 } }, "\u{1F4E2} Partico Pop \u00B7 " + new Date(b.timestamp).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })), React.createElement("div", { style: { fontSize: 14, color: "#fff", lineHeight: 1.6 } }, b.message)))), /* @__PURE__ */ React.createElement(BottomNav, { screen: "home", navigate })));
 };
 const PartyDetailScreen = () => {
   const { screenData, navigate, currentUser, getParty, getUser, addPhoto, respondToInvite, getMyInvite, getPartyPops, markPopRead } = useApp();
@@ -1973,7 +1968,7 @@ const FriendsScreen = () => {
   const myId = currentUser?.id || "";
   const myFriends = currentUser?.friends || [];
   const myRequests = currentUser?.friendRequests || [];
-  const myQRValue = `partico://add-friend/${myId}`;
+  const myQRValue = buildWebLink('add-friend?id=' + myId + '&name=' + encodeURIComponent((currentUser?.firstName||'') + ' ' + (currentUser?.lastName||'')));
   const allOtherUsers = users.filter(
     (u) => u.id !== myId && !myFriends.includes(u.id) && !myRequests.some((r) => r && r.from === u.id)
   );
@@ -1982,7 +1977,7 @@ const FriendsScreen = () => {
     sendFriendRequest(userId);
     showToast(`Friend request sent to ${name}! \u{1F4E8}`);
   };
-  return /* @__PURE__ */ React.createElement("div", { className: "screen", style: { background: "linear-gradient(180deg,#0d0019 0%,#1a003a 100%)", paddingBottom: 80 } }, toast && /* @__PURE__ */ React.createElement(Toast, { msg: toast.msg, type: toast.type }), showQR && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 300, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }, onClick: () => setShowQR(false) }, /* @__PURE__ */ React.createElement("div", { style: { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 24, padding: 28, textAlign: "center", maxWidth: 280 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 700, marginBottom: 4 } }, "Your Partico QR"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.4)", marginBottom: 16 } }, "Friends scan this to add you instantly"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "center", marginBottom: 16 } }, /* @__PURE__ */ React.createElement(QRCode, { value: myQRValue, size: 200 })), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 12 } }, currentUser?.firstName, " ", currentUser?.lastName), /* @__PURE__ */ React.createElement("button", { onClick: () => setShowQR(false), className: "btn-secondary", style: { fontSize: 14 } }, "Close"))), /* @__PURE__ */ React.createElement("div", { style: { padding: "50px 20px 0", background: "rgba(13,0,25,0.92)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.08)", position: "sticky", top: 0, zIndex: 50 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 20, fontWeight: 900 } }, "\u{1F465} Friends"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 1 } }, friends.length, " friend", friends.length !== 1 ? "s" : "", " \xB7 ", requests.length, " request", requests.length !== 1 ? "s" : "")), /* @__PURE__ */ React.createElement("button", { onClick: () => setShowQR(true), style: { background: "linear-gradient(135deg,#c026d3,#7c3aed)", border: "none", color: "#fff", borderRadius: 12, padding: "9px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" } }, "My QR \u{1F4F1}")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 0, marginBottom: 0, borderBottom: "1px solid rgba(255,255,255,0.06)" } }, [{ id: "friends", l: `Friends${friends.length > 0 ? ` (${friends.length})` : ""}` }, { id: "requests", l: `Requests${requests.length > 0 ? ` (${requests.length})` : ""}` }, { id: "find", l: "Find People \u{1F50D}" }].map((t) => /* @__PURE__ */ React.createElement("button", { key: t.id, onClick: () => setTab(t.id), style: { flex: 1, background: "none", color: tab === t.id ? "#e879f9" : "rgba(255,255,255,0.45)", border: "none", borderBottom: `2px solid ${tab === t.id ? "#c026d3" : "transparent"}`, padding: "11px 4px", fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.2s" } }, t.l)))), /* @__PURE__ */ React.createElement("div", { style: { padding: "16px 16px 24px" } }, tab === "friends" && /* @__PURE__ */ React.createElement("div", { style: { animation: "fadeIn 0.3s ease" } }, /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginBottom: 14, background: "linear-gradient(135deg,rgba(192,38,211,0.12),rgba(124,58,237,0.12))", border: "1px solid rgba(192,38,211,0.25)" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, alignItems: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 28 } }, "\u{1F517}"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 14, marginBottom: 2 } }, "Your invite link"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.4)", wordBreak: "break-all" } }, "partico://add-friend/", myId.slice(0, 16), "\u2026")), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+  return /* @__PURE__ */ React.createElement("div", { className: "screen", style: { background: "linear-gradient(180deg,#0d0019 0%,#1a003a 100%)", paddingBottom: 80 } }, toast && /* @__PURE__ */ React.createElement(Toast, { msg: toast.msg, type: toast.type }), showQR && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 300, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }, onClick: () => setShowQR(false) }, /* @__PURE__ */ React.createElement("div", { style: { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 24, padding: 28, textAlign: "center", maxWidth: 280 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 700, marginBottom: 4 } }, "Your Partico QR"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.4)", marginBottom: 16 } }, "Friends scan this to add you instantly"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "center", marginBottom: 16 } }, /* @__PURE__ */ React.createElement(QRCode, { value: myQRValue, size: 200 })), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 12 } }, currentUser?.firstName, " ", currentUser?.lastName), /* @__PURE__ */ React.createElement("button", { onClick: () => setShowQR(false), className: "btn-secondary", style: { fontSize: 14 } }, "Close"))), /* @__PURE__ */ React.createElement("div", { style: { padding: "50px 20px 0", background: "rgba(13,0,25,0.92)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.08)", position: "sticky", top: 0, zIndex: 50 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 20, fontWeight: 900 } }, "\u{1F465} Friends"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 1 } }, friends.length, " friend", friends.length !== 1 ? "s" : "", " \xB7 ", requests.length, " request", requests.length !== 1 ? "s" : "")), /* @__PURE__ */ React.createElement("button", { onClick: () => setShowQR(true), style: { background: "linear-gradient(135deg,#c026d3,#7c3aed)", border: "none", color: "#fff", borderRadius: 12, padding: "9px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" } }, "My QR \u{1F4F1}")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 0, marginBottom: 0, borderBottom: "1px solid rgba(255,255,255,0.06)" } }, [{ id: "friends", l: `Friends${friends.length > 0 ? ` (${friends.length})` : ""}` }, { id: "requests", l: `Requests${requests.length > 0 ? ` (${requests.length})` : ""}` }, { id: "find", l: "Find People \u{1F50D}" }].map((t) => /* @__PURE__ */ React.createElement("button", { key: t.id, onClick: () => setTab(t.id), style: { flex: 1, background: "none", color: tab === t.id ? "#e879f9" : "rgba(255,255,255,0.45)", border: "none", borderBottom: `2px solid ${tab === t.id ? "#c026d3" : "transparent"}`, padding: "11px 4px", fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.2s" } }, t.l)))), /* @__PURE__ */ React.createElement("div", { style: { padding: "16px 16px 24px" } }, tab === "friends" && /* @__PURE__ */ React.createElement("div", { style: { animation: "fadeIn 0.3s ease" } }, /* @__PURE__ */ React.createElement("div", { className: "card", style: { marginBottom: 14, background: "linear-gradient(135deg,rgba(192,38,211,0.12),rgba(124,58,237,0.12))", border: "1px solid rgba(192,38,211,0.25)" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, alignItems: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 28 } }, "\u{1F517}"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 14, marginBottom: 2 } }, "Your invite link"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.4)", wordBreak: "break-all" } }, myQRValue.length > 50 ? myQRValue.slice(0, 50) + "..." : myQRValue)), /* @__PURE__ */ React.createElement("button", { onClick: () => {
     try {
       navigator.clipboard.writeText(myQRValue);
     } catch {
@@ -2059,7 +2054,7 @@ const ProfileScreen = () => {
   const hosted = getHostedParties();
   const myInvites = getMyInvites();
   const attended = myInvites.filter((p) => p.status === "past" || p.invites?.find((i) => i.userId === currentUser?.id && i.status === "accepted"));
-  const myQRValue = `partico://add-friend/${currentUser?.id || ""}`;
+  const myQRValue = buildWebLink('add-friend?id=' + (currentUser?.id || '') + '&name=' + encodeURIComponent((currentUser?.firstName||'') + ' ' + (currentUser?.lastName||'')));
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -2194,7 +2189,7 @@ const DiscoverScreen = () => {
   );
 };
 const App = () => {
-  const { screen, currentUser, navigate } = useApp();
+  const { screen, currentUser, navigate, addFriend, joinPartyFromInvite, parties } = useApp();
   const [ready, setReady] = useState(false);
   
   // Parse URL hash for deep linking
@@ -2203,33 +2198,23 @@ const App = () => {
     if (!hash) return;
     const hashPart = hash.substring(1); // remove #
     
+    if (!currentUser) return;
     if (hashPart.startsWith('add-friend')) {
       const params = new URLSearchParams(hashPart.split('?')[1]);
       const userId = params.get('id');
       const name = params.get('name');
       const avatar = params.get('avatar');
-      if (userId && currentUser && currentUser.id !== userId) {
-        const shouldAdd = confirm(`Add ${name} as a friend?`);
-        if (shouldAdd) {
-          addFriend(userId, name, avatar);
-          alert('Friend added!');
-        }
+      if (userId && currentUser.id !== userId) {
+        addFriend(userId, name, avatar);
+        navigate('friends');
       }
       window.location.hash = '';
     } else if (hashPart.startsWith('join-party')) {
       const params = new URLSearchParams(hashPart.split('?')[1]);
       const partyId = params.get('partyId');
-      const partyName = params.get('partyName');
-      const host = params.get('host');
-      const date = params.get('date');
-      const location = params.get('location');
-      
-      if (partyId && currentUser && parties.find((p) => p.id === partyId)) {
-        const shouldJoin = confirm(`Join ${partyName} hosted by ${host}?`);
-        if (shouldJoin) {
-          joinPartyFromInvite(partyId);
-          navigate('partyDetail', { partyId });
-        }
+      if (partyId) {
+        joinPartyFromInvite(partyId);
+        navigate('partyDetail', { partyId });
       }
       window.location.hash = '';
     }
