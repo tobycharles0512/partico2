@@ -594,7 +594,7 @@ const AppProvider = ({ children }) => {
   };
   return /* @__PURE__ */ React.createElement(AppCtx.Provider, { value: ctx }, children);
 };
-const FireworksCanvas = ({ colors = ["#c026d3", "#fbbf24", "#34d399", "#60a5fa", "#f87171"], onDone, duration = 3e3 }) => {
+const FireworksCanvas = ({ colors = ["#c026d3", "#fbbf24", "#34d399", "#60a5fa", "#f87171"], onDone, duration = 3e3, fwStyle = "classic" }) => {
   const ref = useRef(null);
   useEffect(() => {
     const canvas = ref.current;
@@ -602,40 +602,43 @@ const FireworksCanvas = ({ colors = ["#c026d3", "#fbbf24", "#34d399", "#60a5fa",
     const ctx = canvas.getContext("2d");
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+    const W = canvas.width, H = canvas.height;
     const particles = [];
+    const drawStar = (ctx2, x, y, size) => { ctx2.beginPath(); for (let j = 0; j < 5; j++) { const a1 = (j * 4 * Math.PI / 5) - Math.PI / 2; const a2 = (j * 4 * Math.PI / 5 + 2 * Math.PI / 5) - Math.PI / 2; ctx2.lineTo(x + size * Math.cos(a1), y + size * Math.sin(a1)); ctx2.lineTo(x + size * 0.4 * Math.cos(a2), y + size * 0.4 * Math.sin(a2)); } ctx2.closePath(); ctx2.fill(); };
+    const drawSparkle = (ctx2, x, y, size) => { ctx2.beginPath(); for (let j = 0; j < 4; j++) { const a = j * Math.PI / 2; ctx2.moveTo(x, y); ctx2.lineTo(x + Math.cos(a) * size, y + Math.sin(a) * size); } ctx2.lineWidth = 1.5; ctx2.stroke(); };
     const createBurst = (x, y) => {
       const color = colors[Math.floor(Math.random() * colors.length)];
-      for (let i = 0; i < 60; i++) {
-        const angle = Math.PI * 2 / 60 * i;
-        const speed = Math.random() * 6 + 2;
-        particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, alpha: 1, color, size: Math.random() * 4 + 2, decay: Math.random() * 0.015 + 8e-3 });
+      const count = fwStyle === "sparkle" ? 40 : 60;
+      for (let i = 0; i < count; i++) {
+        const angle = Math.PI * 2 / count * i;
+        const speed = fwStyle === "sparkle" ? Math.random() * 4 + 1.5 : Math.random() * 6 + 2;
+        const size = fwStyle === "sparkle" ? Math.random() * 3 + 1 : fwStyle === "stars" ? Math.random() * 5 + 3 : Math.random() * 4 + 2;
+        particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, alpha: 1, color, size, decay: Math.random() * 0.015 + 8e-3, twinkle: fwStyle === "sparkle" ? Math.random() * Math.PI * 2 : 0 });
       }
     };
     for (let i = 0; i < 8; i++) {
-      setTimeout(() => createBurst(Math.random() * canvas.width, Math.random() * canvas.height * 0.6 + 50), i * 200);
+      setTimeout(() => createBurst(Math.random() * W, Math.random() * H * 0.6 + 50), i * 200);
     }
-    const interval = setInterval(() => createBurst(Math.random() * canvas.width, Math.random() * canvas.height * 0.6 + 50), 400);
-    let animId;
+    const interval = setInterval(() => createBurst(Math.random() * W, Math.random() * H * 0.6 + 50), 400);
+    let animId, frame = 0;
     const animate = () => {
       ctx.fillStyle = "rgba(13,0,25,0.15)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, W, H);
+      frame++;
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.vy += 0.12;
+        p.x += p.vx; p.y += p.vy;
+        p.vy += fwStyle === "sparkle" ? 0.06 : 0.12;
         p.vx *= 0.98;
         p.alpha -= p.decay;
-        if (p.alpha <= 0) {
-          particles.splice(i, 1);
-          continue;
-        }
+        if (p.alpha <= 0) { particles.splice(i, 1); continue; }
         ctx.save();
-        ctx.globalAlpha = p.alpha;
-        ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
+        const displayAlpha = fwStyle === "sparkle" ? p.alpha * (0.5 + 0.5 * Math.sin(p.twinkle + frame * 0.15)) : p.alpha;
+        ctx.globalAlpha = displayAlpha;
+        ctx.fillStyle = p.color; ctx.strokeStyle = p.color;
+        if (fwStyle === "stars") { drawStar(ctx, p.x, p.y, p.size); }
+        else if (fwStyle === "sparkle") { drawSparkle(ctx, p.x, p.y, p.size); }
+        else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill(); }
         ctx.restore();
       }
       animId = requestAnimationFrame(animate);
@@ -651,6 +654,84 @@ const FireworksCanvas = ({ colors = ["#c026d3", "#fbbf24", "#34d399", "#60a5fa",
       cancelAnimationFrame(animId);
       clearTimeout(timer);
     };
+  }, []);
+  return /* @__PURE__ */ React.createElement("canvas", { ref, style: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 999 } });
+};
+const InviteEffectCanvas = ({ type = "confetti", onDone, duration = 3e3 }) => {
+  const ref = useRef(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const W = canvas.width, H = canvas.height;
+    const particles = [];
+    const rand = (min, max) => Math.random() * (max - min) + min;
+    const confettiColors = ["#c026d3", "#fbbf24", "#34d399", "#60a5fa", "#f87171", "#e879f9", "#a78bfa"];
+    const init = () => {
+      const count = type === "bubbles" ? 50 : 120;
+      for (let i = 0; i < count; i++) {
+        let p = { alpha: 1, decay: rand(0.003, 0.008) };
+        if (type === "confetti") {
+          p.x = rand(0, W); p.y = rand(-H * 0.5, -10);
+          p.vx = rand(-2, 2); p.vy = rand(2, 5);
+          p.color = confettiColors[Math.floor(rand(0, confettiColors.length))];
+          p.w = rand(6, 14); p.h = rand(3, 7);
+          p.rot = rand(0, Math.PI * 2); p.rotSpeed = rand(-0.12, 0.12);
+        } else if (type === "bubbles") {
+          p.x = rand(0, W); p.y = rand(H, H + 200);
+          p.vx = rand(-0.5, 0.5); p.vy = rand(-2.5, -0.8);
+          p.size = rand(8, 30); p.decay = rand(0.002, 0.006);
+          p.wobble = rand(0, Math.PI * 2); p.wobbleSpeed = rand(0.02, 0.06);
+        } else if (type === "petals") {
+          p.x = rand(0, W); p.y = rand(-H * 0.3, -10);
+          p.vx = rand(-1, 1); p.vy = rand(1, 3);
+          p.color = ["#f9a8d4", "#ec4899", "#fda4af", "#fecdd3", "#fff1f2"][Math.floor(rand(0, 5))];
+          p.size = rand(5, 12); p.rot = rand(0, Math.PI * 2); p.rotSpeed = rand(-0.04, 0.04);
+          p.wobble = rand(0, Math.PI * 2); p.wobbleSpeed = rand(0.02, 0.05);
+        }
+        particles.push(p);
+      }
+    };
+    init();
+    let animId, frame = 0;
+    const animate = () => {
+      ctx.clearRect(0, 0, W, H);
+      frame++;
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx; p.y += p.vy; p.alpha -= p.decay;
+        if (p.alpha <= 0) { particles.splice(i, 1); continue; }
+        ctx.save(); ctx.globalAlpha = p.alpha;
+        if (type === "confetti") {
+          p.vy += 0.04; p.vx += rand(-0.1, 0.1);
+          ctx.translate(p.x, p.y); ctx.rotate(p.rot); p.rot += p.rotSpeed;
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        } else if (type === "bubbles") {
+          p.wobble += p.wobbleSpeed;
+          p.x += Math.sin(p.wobble) * 0.5;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 1.5; ctx.stroke();
+          const grad = ctx.createRadialGradient(p.x - p.size * 0.3, p.y - p.size * 0.3, p.size * 0.1, p.x, p.y, p.size);
+          grad.addColorStop(0, "rgba(255,255,255,0.2)"); grad.addColorStop(1, "rgba(192,38,211,0.05)");
+          ctx.fillStyle = grad; ctx.fill();
+        } else if (type === "petals") {
+          p.wobble += p.wobbleSpeed;
+          p.x += Math.sin(p.wobble) * 0.8;
+          p.rot += p.rotSpeed;
+          ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+          ctx.fillStyle = p.color;
+          ctx.beginPath(); ctx.ellipse(0, 0, p.size * 0.4, p.size, 0, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+      }
+      if (particles.length > 0) animId = requestAnimationFrame(animate);
+    };
+    animate();
+    const timer = setTimeout(() => { cancelAnimationFrame(animId); if (onDone) onDone(); }, duration);
+    return () => { cancelAnimationFrame(animId); clearTimeout(timer); };
   }, []);
   return /* @__PURE__ */ React.createElement("canvas", { ref, style: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 999 } });
 };
@@ -1199,6 +1280,7 @@ const CreatePartyScreen = () => {
     timeInput: ""
   });
   const [showFireworksPreview, setShowFireworksPreview] = useState(false);
+  const [previewEffect, setPreviewEffect] = useState(null);
   const fileRef = useRef(null);
   const imgRef = useRef(null);
   const coverImgRef = useRef(null);
@@ -1371,8 +1453,9 @@ const CreatePartyScreen = () => {
       React.createElement("div", { style: { marginBottom: 18 } },
         React.createElement("div", { style: { fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.6)", marginBottom: 8 } }, "\u2728 Invite Effect"),
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 } },
-          [{ id: "auto", label: "Auto", desc: "Match event type" }, { id: "confetti", label: "Confetti", desc: "Colourful burst" }, { id: "fireworks", label: "Fireworks", desc: "Classic sparkle" }, { id: "bubbles", label: "Bubbles", desc: "Floating bubbles" }, { id: "petals", label: "Petals", desc: "Falling petals" }, { id: "none", label: "None", desc: "Keep it clean" }].map(eff =>
-            React.createElement("div", { key: eff.id, onClick: () => set("inviteEffect", eff.id), style: { padding: "10px 6px", borderRadius: 12, border: `2px solid ${form.inviteEffect === eff.id ? "#c026d3" : "rgba(255,255,255,0.1)"}`, background: form.inviteEffect === eff.id ? "rgba(192,38,211,0.15)" : "rgba(255,255,255,0.04)", cursor: "pointer", textAlign: "center", transition: "all 0.2s" } },
+          [{ id: "auto", label: "Auto", desc: "Match event type", icon: "\u2728" }, { id: "confetti", label: "Confetti", desc: "Colourful burst", icon: "\u{1F38A}" }, { id: "fireworks", label: "Fireworks", desc: "Classic sparkle", icon: "\u{1F386}" }, { id: "bubbles", label: "Bubbles", desc: "Floating bubbles", icon: "\u{1FAE7}" }, { id: "petals", label: "Petals", desc: "Falling petals", icon: "\u{1F338}" }, { id: "none", label: "None", desc: "Keep it clean", icon: "\u{1F6AB}" }].map(eff =>
+            React.createElement("div", { key: eff.id, onClick: () => { set("inviteEffect", eff.id); if (eff.id !== "auto") setPreviewEffect(eff.id); }, style: { padding: "10px 6px", borderRadius: 12, border: `2px solid ${form.inviteEffect === eff.id ? "#c026d3" : "rgba(255,255,255,0.1)"}`, background: form.inviteEffect === eff.id ? "rgba(192,38,211,0.15)" : "rgba(255,255,255,0.04)", cursor: "pointer", textAlign: "center", transition: "all 0.2s" } },
+              React.createElement("div", { style: { fontSize: 20, marginBottom: 2 } }, eff.icon),
               React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: form.inviteEffect === eff.id ? "#e879f9" : "#fff" } }, eff.label),
               React.createElement("div", { style: { fontSize: 9, color: "rgba(255,255,255,0.4)", marginTop: 2 } }, eff.desc)
             )
@@ -1460,7 +1543,7 @@ const CreatePartyScreen = () => {
     true,
     true
   ];
-  return /* @__PURE__ */ React.createElement("div", { className: "screen", style: { background: "linear-gradient(180deg,#0d0019 0%,#1a003a 100%)" } }, toast && /* @__PURE__ */ React.createElement(Toast, { msg: toast.msg, type: toast.type }), showFireworksPreview && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 200 }, onClick: () => setShowFireworksPreview(false) }, /* @__PURE__ */ React.createElement(FireworksCanvas, { colors: form.fireworksColors, duration: 3e3, onDone: () => setShowFireworksPreview(false) }), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 80, left: 0, right: 0, textAlign: "center", color: "#fff", fontSize: 16, fontWeight: 700 } }, "Tap to close preview")), /* @__PURE__ */ React.createElement("div", { style: { padding: "50px 20px 16px", background: "rgba(13,0,25,0.9)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.08)", position: "sticky", top: 0, zIndex: 50 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => navigate("home"), style: { background: "rgba(255,255,255,0.08)", border: "none", color: "#fff", borderRadius: 10, width: 36, height: 36, fontSize: 18, cursor: "pointer" } }, "\u2190"), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 800, fontSize: 18 } }, "Host a Party")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4 } }, stepLabels.map((l, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { flex: 1, height: 4, borderRadius: 2, background: i <= step ? "linear-gradient(90deg,#c026d3,#7c3aed)" : "rgba(255,255,255,0.1)", transition: "background 0.3s" } }))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 6 } }, "Step ", step + 1, " of ", totalSteps, ": ", stepLabels[step])), /* @__PURE__ */ React.createElement("div", { style: { padding: "20px 20px 120px" } }, /* @__PURE__ */ React.createElement("div", { style: { animation: "fadeIn 0.3s ease" }, key: step }, steps[step])), /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, padding: "12px 20px", background: "rgba(13,0,25,0.95)", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", gap: 10 } }, step > 0 && /* @__PURE__ */ React.createElement("button", { className: "btn-secondary", style: { flex: "0 0 auto", width: 100 }, onClick: () => setStep((s) => s - 1) }, "\u2190 Back"), step < totalSteps - 1 ? /* @__PURE__ */ React.createElement("button", { className: "btn-primary", style: { flex: 1, opacity: canNext[step] ? 1 : 0.5 }, onClick: () => {
+  return /* @__PURE__ */ React.createElement("div", { className: "screen", style: { background: "linear-gradient(180deg,#0d0019 0%,#1a003a 100%)" } }, toast && /* @__PURE__ */ React.createElement(Toast, { msg: toast.msg, type: toast.type }), showFireworksPreview && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 200 }, onClick: () => setShowFireworksPreview(false) }, /* @__PURE__ */ React.createElement(FireworksCanvas, { colors: form.fireworksColors, duration: 3e3, fwStyle: form.fireworksStyle, onDone: () => setShowFireworksPreview(false) }), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 80, left: 0, right: 0, textAlign: "center", color: "#fff", fontSize: 16, fontWeight: 700 } }, "Tap to close preview")), previewEffect && /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 200 }, onClick: () => setPreviewEffect(null) }, previewEffect === "fireworks" ? React.createElement(FireworksCanvas, { colors: form.fireworksColors, duration: 2500, fwStyle: form.fireworksStyle, onDone: () => setPreviewEffect(null) }) : previewEffect === "none" ? null : React.createElement(InviteEffectCanvas, { type: previewEffect, duration: 2500, onDone: () => setPreviewEffect(null) }), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", bottom: 80, left: 0, right: 0, textAlign: "center", color: "#fff", fontSize: 16, fontWeight: 700, textShadow: "0 2px 8px rgba(0,0,0,0.8)" } }, previewEffect === "none" ? "No effect selected" : "Tap to close preview")), /* @__PURE__ */ React.createElement("div", { style: { padding: "50px 20px 16px", background: "rgba(13,0,25,0.9)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.08)", position: "sticky", top: 0, zIndex: 50 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => navigate("home"), style: { background: "rgba(255,255,255,0.08)", border: "none", color: "#fff", borderRadius: 10, width: 36, height: 36, fontSize: 18, cursor: "pointer" } }, "\u2190"), /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 800, fontSize: 18 } }, "Host a Party")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4 } }, stepLabels.map((l, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { flex: 1, height: 4, borderRadius: 2, background: i <= step ? "linear-gradient(90deg,#c026d3,#7c3aed)" : "rgba(255,255,255,0.1)", transition: "background 0.3s" } }))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 6 } }, "Step ", step + 1, " of ", totalSteps, ": ", stepLabels[step])), /* @__PURE__ */ React.createElement("div", { style: { padding: "20px 20px 120px" } }, /* @__PURE__ */ React.createElement("div", { style: { animation: "fadeIn 0.3s ease" }, key: step }, steps[step])), /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", bottom: 0, left: 0, right: 0, padding: "12px 20px", background: "rgba(13,0,25,0.95)", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", gap: 10 } }, step > 0 && /* @__PURE__ */ React.createElement("button", { className: "btn-secondary", style: { flex: "0 0 auto", width: 100 }, onClick: () => setStep((s) => s - 1) }, "\u2190 Back"), step < totalSteps - 1 ? /* @__PURE__ */ React.createElement("button", { className: "btn-primary", style: { flex: 1, opacity: canNext[step] ? 1 : 0.5 }, onClick: () => {
     if (canNext[step]) setStep((s) => s + 1);
   } }, "Next \u2192") : /* @__PURE__ */ React.createElement("button", { className: "btn-primary", style: { flex: 1, background: "linear-gradient(135deg,#16a34a,#15803d)" }, onClick: handleCreate }, "\u{1F389} Create Party!")));
 };
@@ -1597,8 +1680,11 @@ const InvitationScreen = () => {
       case "fireworks":
         return React.createElement("div", { style: { height: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 24, position: "relative" } },
           showCoverReveal && party.coverImage && React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 1000, animation: "coverReveal 1.2s ease-out forwards" } }, React.createElement("img", { src: party.coverImage, style: { width: "100%", height: "100%", objectFit: "cover" }, alt: "" })),
-          !showCoverReveal && showParticles && React.createElement(EventParticles, { eventType: party.eventType, onDone: () => setShowParticles(false) }),
-          !showCoverReveal && showFireworks && fw.enabled !== false && React.createElement(FireworksCanvas, { colors: fireworksColors, duration: 3500, onDone: () => setShowFireworks(false) }),
+          !showCoverReveal && showParticles && (party.inviteEffect === "auto" || !party.inviteEffect) && React.createElement(EventParticles, { eventType: party.eventType, onDone: () => setShowParticles(false) }),
+          !showCoverReveal && showParticles && party.inviteEffect === "confetti" && React.createElement(InviteEffectCanvas, { type: "confetti", duration: 3500, onDone: () => setShowParticles(false) }),
+          !showCoverReveal && showParticles && party.inviteEffect === "bubbles" && React.createElement(InviteEffectCanvas, { type: "bubbles", duration: 3500, onDone: () => setShowParticles(false) }),
+          !showCoverReveal && showParticles && party.inviteEffect === "petals" && React.createElement(InviteEffectCanvas, { type: "petals", duration: 3500, onDone: () => setShowParticles(false) }),
+          !showCoverReveal && showFireworks && fw.enabled !== false && (party.inviteEffect !== "none") && React.createElement(FireworksCanvas, { colors: fireworksColors, duration: 3500, fwStyle: fw.style || "classic", onDone: () => setShowFireworks(false) }),
           React.createElement("div", { style: { position: "relative", zIndex: 10, animation: "pop 0.6s ease", opacity: showCoverReveal ? 0 : 1, transition: "opacity 0.5s ease", fontFamily: themeFont } },
             React.createElement("div", { style: { fontSize: 76, marginBottom: 16, animation: "float 2s ease-in-out infinite" } }, inviteEmoji),
             // Personalised greeting
@@ -1701,8 +1787,8 @@ const InvitationScreen = () => {
         return React.createElement("div", { style: { textAlign: "center", padding: "40px 0" } },
           // Animated RSVP celebration
           showRsvpCelebration && React.createElement(React.Fragment, null,
-            React.createElement(EventParticles, { eventType: party.eventType, onDone: () => {} }),
-            React.createElement(FireworksCanvas, { colors: fireworksColors, duration: 3e3, onDone: () => setShowRsvpCelebration(false) })
+            party.inviteEffect !== "none" && (party.inviteEffect === "confetti" ? React.createElement(InviteEffectCanvas, { type: "confetti", duration: 3e3, onDone: () => {} }) : party.inviteEffect === "bubbles" ? React.createElement(InviteEffectCanvas, { type: "bubbles", duration: 3e3, onDone: () => {} }) : party.inviteEffect === "petals" ? React.createElement(InviteEffectCanvas, { type: "petals", duration: 3e3, onDone: () => {} }) : React.createElement(EventParticles, { eventType: party.eventType, onDone: () => {} })),
+            party.inviteEffect !== "none" && React.createElement(FireworksCanvas, { colors: fireworksColors, duration: 3e3, fwStyle: fw.style || "classic", onDone: () => setShowRsvpCelebration(false) })
           ),
           rsvp === "accepted" ? React.createElement(React.Fragment, null,
             React.createElement("div", { style: { fontSize: 76, marginBottom: 16, animation: "float 2s ease-in-out infinite" } }, "\u{1F38A}"),
