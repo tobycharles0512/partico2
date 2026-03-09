@@ -1,0 +1,9 @@
+# macOS
+.DS_Store
+
+# Xcode build artifacts
+Partico-Xcode/build/
+*.xcuserdata
+
+# IDE
+.obsidian/
