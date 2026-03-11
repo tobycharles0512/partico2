@@ -32,10 +32,10 @@ class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
     }
 
     func loadParticoApp() {
-        // Load the Partico HTML file bundled with the app
-        if let url = Bundle.main.url(forResource: "Partico", withExtension: "html") {
-            let request = URLRequest(url: url)
-            webView.load(request)
+        // Load the Partico HTML file as a UTF-8 string to ensure emoji rendering
+        if let url = Bundle.main.url(forResource: "Partico", withExtension: "html"),
+           let htmlString = try? String(contentsOf: url, encoding: .utf8) {
+            webView.loadHTMLString(htmlString, baseURL: url.deletingLastPathComponent())
         } else {
             showError("Could not find Partico.html in the app bundle.")
         }
