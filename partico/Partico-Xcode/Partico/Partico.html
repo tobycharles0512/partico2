@@ -61,7 +61,7 @@ window.QRCode.CorrectLevel={L:0,M:1,Q:2,H:3};
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;color:#fff !important;-webkit-text-fill-color:#fff !important;}
 html,body,#root{height:100%;width:100%;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif,'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji';background:#0d0d0d;color:#fff;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif,'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji';background:linear-gradient(135deg,#0d0d0d 0%,#1a0d2e 50%,#00ff41 100%);color:#fff;}
 ::-webkit-scrollbar{width:4px;}
 .leaflet-container{border-radius:14px;z-index:1;}
 .leaflet-control-attribution{display:none;}
@@ -77,11 +77,15 @@ button{font-family:inherit;cursor:pointer;border:none;}
 @keyframes pop{0%{transform:scale(0.5);opacity:0;}70%{transform:scale(1.1);}100%{transform:scale(1);opacity:1;}}
 @keyframes glow{0%,100%{text-shadow:0 0 20px rgba(0,255,65,0.8);}50%{text-shadow:0 0 40px rgba(0,255,65,1),0 0 60px rgba(0,217,68,0.8);}}
 @keyframes coverReveal{0%{transform:scale(1.15);opacity:0;}60%{opacity:1;transform:scale(1);}85%{opacity:1;}100%{opacity:0;transform:scale(1);}}
+@keyframes bubble{0%{box-shadow:0 0 0 0 rgba(0,255,65,0.7);}50%{box-shadow:0 0 0 10px rgba(0,255,65,0);}100%{box-shadow:0 0 0 0 rgba(0,255,65,0);}}
 .screen{position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:hidden;}
 .card{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:16px;padding:16px;}
-.btn-primary{background:linear-gradient(135deg,#00ff41,#00d944);color:#000;border-radius:12px;padding:14px 20px;font-size:16px;font-weight:600;width:100%;transition:opacity 0.2s,transform 0.1s;}
+.btn-primary{background:linear-gradient(135deg,#00ff41,#00d944);color:#000;border-radius:12px;padding:14px 20px;font-size:16px;font-weight:600;width:100%;transition:opacity 0.2s,transform 0.1s;position:relative;overflow:hidden;}
+.btn-primary:hover{animation:bubble 0.6s ease-out;}
 .btn-primary:active{transform:scale(0.97);opacity:0.85;}
-.btn-secondary{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:12px;padding:12px 20px;font-size:15px;font-weight:500;width:100%;transition:opacity 0.2s;}
+.btn-secondary{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:12px;padding:12px 20px;font-size:15px;font-weight:500;width:100%;transition:opacity 0.2s;position:relative;overflow:hidden;}
+.btn-secondary:hover{animation:bubble 0.6s ease-out;}
+.btn-secondary:active{transform:scale(0.97);opacity:0.85;}
 .input-field{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:14px 16px;font-size:15px;color:#fff;width:100%;}
 .input-field::placeholder{color:rgba(255,255,255,0.4);}
 .input-field:focus{border-color:#00ff41;background:rgba(0,255,65,0.08);}
@@ -274,6 +278,8 @@ const getCountdown = (dateStr, timeStr) => {
   const s = Math.floor(diff % 6e4 / 1e3);
   return { d, h, m, s };
 };
+// Simple auth without backend
+
 const AppCtx = createContext(null);
 const useApp = () => useContext(AppCtx);
 const AppProvider = ({ children }) => {
@@ -348,6 +354,7 @@ const AppProvider = ({ children }) => {
     ls.set("partico_current_user", u);
     return { success: true, user: u };
   };
+
   const logout = () => {
     setCurrentUser(null);
     ls.del("partico_current_user");
@@ -1177,6 +1184,7 @@ const BottomNav = ({ screen, navigate }) => {
     { id: "home", icon: "\u{1F3E0}", label: "Home" },
     { id: "calendar", icon: "\u{1F4C5}", label: "Calendar" },
     { id: "create", icon: "\u{1F389}", label: "Host" },
+    { id: "friends", icon: "\u{1F465}", label: "Friends" },
     { id: "discover", icon: "\u{1F50D}", label: "Discover" },
     { id: "profile", icon: "\u{1F464}", label: "Profile" }
   ];
@@ -1226,7 +1234,7 @@ const LoginScreen = () => {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
-  const handleLogin = async () => {
+  const handleLogin = () => {
     if (!email || !password) {
       setErr("Please fill in all fields");
       return;
@@ -2466,7 +2474,7 @@ const FriendsScreen = () => {
     declineFriendRequest(req.from);
     showToast("Request declined");
   }, style: { flex: 1, padding: "11px", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 10, color: "rgba(255,255,255,0.7)", fontWeight: 600, cursor: "pointer", fontSize: 14 } }, "Decline"))))), tab === "find" && /* @__PURE__ */ React.createElement("div", { style: { animation: "fadeIn 0.3s ease" } }, /* @__PURE__ */ React.createElement("input", { className: "input-field", style: { marginBottom: 12 }, placeholder: "\u{1F50D} Search by name, email or phone...", value: searchQ, onChange: (e) => setSearchQ(e.target.value), autoFocus: true }), !searchQ && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.35)", textAlign: "center", padding: "12px 0 4px" } }, "Type to search all Partico users"), filtered.slice(0, 25).map((u) => {
-    const alreadySent = (myRequests || []).some((r) => r && r.to === u.id);
+    const alreadySent = users.find((user) => user.id === u.id)?.friendRequests?.some((r) => r && r.from === myId) || false;
     return /* @__PURE__ */ React.createElement("div", { key: u.id, className: "card", style: { marginBottom: 8, display: "flex", alignItems: "center", gap: 12 } }, /* @__PURE__ */ React.createElement(Avatar, { user: u, size: 44 }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontWeight: 700, fontSize: 14 } }, u.firstName, " ", u.lastName), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, u.email)), /* @__PURE__ */ React.createElement("button", { onClick: () => handleSend(u.id, u.firstName), style: { background: alreadySent ? "rgba(255,255,255,0.08)" : "linear-gradient(135deg,#00ff41,#00d944)", color: "#fff", border: alreadySent ? "1px solid rgba(255,255,255,0.2)" : "none", borderRadius: 10, padding: "8px 14px", fontSize: 12, fontWeight: 700, cursor: alreadySent ? "default" : "pointer", flexShrink: 0, opacity: alreadySent ? 0.6 : 1 } }, alreadySent ? "Sent \u2713" : "+ Add"));
   }), searchQ && filtered.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "rgba(255,255,255,0.3)", padding: 40, fontSize: 14 } }, 'No users found for "', searchQ, '"'))), /* @__PURE__ */ React.createElement(BottomNav, { screen: "friends", navigate }));
 };
@@ -2800,7 +2808,7 @@ const App = () => {
   if (screen === "landing") return /* @__PURE__ */ React.createElement(LandingScreen, null);
   if (screen === "login") return /* @__PURE__ */ React.createElement(LoginScreen, null);
   if (screen === "signup") return /* @__PURE__ */ React.createElement(SignupScreen, null);
-  if (!currentUser) return /* @__PURE__ */ React.createElement(LoginScreen, null);
+  if (!currentUser && screen !== "home") return /* @__PURE__ */ React.createElement(LoginScreen, null);
   const wrap = (c) => /* @__PURE__ */ React.createElement(ErrorBoundary, null, c);
   if (screen === "home") return wrap(/* @__PURE__ */ React.createElement(HomeScreen, null));
   if (screen === "createParty") return wrap(/* @__PURE__ */ React.createElement(CreatePartyScreen, null));
