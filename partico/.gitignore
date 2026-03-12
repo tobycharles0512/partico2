@@ -7,3 +7,6 @@ Partico-Xcode/build/
 
 # IDE
 .obsidian/
+
+# Git worktrees
+.worktrees/
