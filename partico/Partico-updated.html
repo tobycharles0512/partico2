@@ -6,6 +6,7 @@
 <title>Partico 🎉</title>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" onerror="document.write('\x3Cscript crossorigin src=\'https://unpkg.com/react@18.2.0/umd/react.production.min.js\'\x3E\x3C\/script\x3E')"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" onerror="document.write('\x3Cscript crossorigin src=\'https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js\'\x3E\x3C\/script\x3E')"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Babel removed: JSX pre-compiled -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script>
@@ -274,23 +275,15 @@ const getCountdown = (dateStr, timeStr) => {
   const s = Math.floor(diff % 6e4 / 1e3);
   return { d, h, m, s };
 };
-const BACKEND_URL = 'http://localhost:3001';
+const SUPABASE_URL = 'https://ywkmntavswmvqizyumlm.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_OfMhiSIuKSGqZlUB2H4QYQ_REAXnH3o';
+let supabase = null;
 
-const apiCall = async (endpoint, method = 'POST', body = null) => {
-  const options = { method, headers: { 'Content-Type': 'application/json' } };
-  const token = ls.get('partico_token');
-  if (token) options.headers['Authorization'] = 'Bearer ' + token;
-  if (body) options.body = JSON.stringify(body);
-
-  try {
-    const res = await fetch(BACKEND_URL + endpoint, options);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'API error');
-    return data;
-  } catch (err) {
-    console.error('API error:', err);
-    throw err;
+const initSupabase = () => {
+  if (!supabase && window.supabase) {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   }
+  return supabase;
 };
 
 const AppCtx = createContext(null);
@@ -314,18 +307,30 @@ const AppProvider = ({ children }) => {
   useEffect(() => {
     const u = ls.get("partico_users", []);
     const p = ls.get("partico_parties", []);
-    const token = ls.get("partico_token", null);
     setUsers(u);
     setParties(p);
 
-    // If there's a JWT token, try to load the user from /api/auth/me
-    if (token) {
-      apiCall('/api/auth/me', 'GET').then(res => {
-        setCurrentUser(res.user);
-      }).catch(err => {
-        // Token expired, clear it
-        ls.del("partico_token");
-      });
+    // Initialize and check Supabase session
+    const sb = initSupabase();
+    if (sb) {
+      sb.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          const user = {
+            id: session.user.id,
+            email: session.user.email,
+            firstName: session.user.user_metadata?.firstName || '',
+            lastName: session.user.user_metadata?.lastName || '',
+            phone: session.user.user_metadata?.phone || '',
+            profilePic: null,
+            bio: '',
+            friends: [],
+            friendRequests: [],
+            parties: [],
+            notifs: []
+          };
+          setCurrentUser(user);
+        }
+      }).catch(err => console.log('Session check:', err));
     }
   }, []);
   const saveUsers = (u) => {
@@ -342,15 +347,13 @@ const AppProvider = ({ children }) => {
   };
   const register = async (data) => {
     try {
-      const response = await apiCall('/api/auth/signup', 'POST', {
+      const sb = initSupabase();
+      if (!sb) throw new Error('Auth not ready');
+      const { error } = await sb.auth.signUp({
         email: data.email.toLowerCase(),
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phone: data.phone,
-        password: data.password,
-        confirm: data.confirm
+        password: data.password
       });
-      // Navigate to verification screen, store form data
+      if (error) throw error;
       navigate("verify-signup", {
         email: data.email.toLowerCase(),
         signupData: data
@@ -362,35 +365,66 @@ const AppProvider = ({ children }) => {
   };
   const login = async (email, password) => {
     try {
-      const response = await apiCall('/api/auth/login', 'POST', {
+      const sb = initSupabase();
+      if (!sb) throw new Error('Auth not ready');
+      const { data, error } = await sb.auth.signInWithPassword({
         email: email.toLowerCase(),
         password
       });
-      ls.set('partico_token', response.token);
-      setCurrentUser(response.user);
-      return { success: true, user: response.user };
+      if (error) throw error;
+      const user = {
+        id: data.user.id,
+        email: data.user.email,
+        firstName: data.user.user_metadata?.firstName || '',
+        lastName: data.user.user_metadata?.lastName || '',
+        phone: data.user.user_metadata?.phone || '',
+        profilePic: null,
+        bio: '',
+        friends: [],
+        friendRequests: [],
+        parties: [],
+        notifs: []
+      };
+      setCurrentUser(user);
+      return { success: true, user };
     } catch (err) {
       return { error: err.message };
     }
   };
   const verifySignup = async (email, code) => {
     try {
-      const response = await apiCall('/api/auth/verify-signup', 'POST', {
+      const sb = initSupabase();
+      if (!sb) throw new Error('Auth not ready');
+      const { data, error } = await sb.auth.verifyOtp({
         email: email.toLowerCase(),
-        code
+        token: code,
+        type: 'signup'
       });
-      ls.set('partico_token', response.token);
-      setCurrentUser(response.user);
-      return { success: true, user: response.user };
+      if (error) throw error;
+      const user = {
+        id: data.user.id,
+        email: data.user.email,
+        firstName: data.user.user_metadata?.firstName || '',
+        lastName: data.user.user_metadata?.lastName || '',
+        phone: data.user.user_metadata?.phone || '',
+        profilePic: null,
+        bio: '',
+        friends: [],
+        friendRequests: [],
+        parties: [],
+        notifs: []
+      };
+      setCurrentUser(user);
+      return { success: true, user };
     } catch (err) {
       return { error: err.message };
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    const sb = initSupabase();
+    if (sb) await sb.auth.signOut();
     setCurrentUser(null);
-    ls.del("partico_current_user");
-    ls.del("partico_token");
     navigate("login");
   };
   const updateCurrentUser = (updates) => {
